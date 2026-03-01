@@ -1,0 +1,2161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaGuardia Student Alert Analysis App - Version 3</title>
+    <meta name="version" content="3">
+    <meta name="description" content="Version 3 - Added three-category classification (Negative Alerts, Positive Feedback, Referrals), smart reason splitting from CSV data labels, faculty-only referral filtering, tutoring center breakdown, and consistent data filtering across all tabs.">
+    <meta name="author" content="Josh Goldblatt using Claude">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 2px dashed #dee2e6;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.1);
+        }
+
+        .file-input-wrapper {
+            margin-bottom: 20px;
+        }
+
+        .file-input-wrapper label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #495057;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            display: none;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .file-input-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .file-status {
+            display: inline-block;
+            margin-left: 15px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .file-status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .required-columns {
+            background: #e7f3ff;
+            border-left: 4px solid #4a90e2;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 5px;
+        }
+
+        .required-columns h3 {
+            color: #2c5282;
+            margin-bottom: 10px;
+        }
+
+        .required-columns ul {
+            list-style-position: inside;
+            color: #2c5282;
+        }
+
+        .process-button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .process-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .process-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        /* DASHBOARD SECTION - HIDDEN BY DEFAULT */
+        .dashboard-section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* TAB STYLES */
+        .tabs-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            color: #6c757d;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+        }
+
+        .tab-button:hover {
+            color: #667eea;
+        }
+
+        .tab-button.active {
+            color: #667eea;
+        }
+
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* CARD AND TABLE STYLES */
+        .score-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .score-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            border-left: 4px solid;
+        }
+
+        .score-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .score-card:nth-child(1) { border-left-color: #4a90e2; }
+        .score-card:nth-child(2) { border-left-color: #50e3c2; }
+        .score-card:nth-child(3) { border-left-color: #f5a623; }
+        .score-card:nth-child(4) { border-left-color: #bd10e0; }
+        .score-card:nth-child(5) { border-left-color: #7ed321; }
+        .score-card:nth-child(6) { border-left-color: #ff6b6b; }
+        .score-card:nth-child(7) { border-left-color: #9013fe; }
+        .score-card:nth-child(8) { border-left-color: #f5a623; }
+
+        .score-card h3 {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .score-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .score-card .detail {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .alert-breakdown {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .alert-breakdown h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .alert-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+
+        .alert-item:hover {
+            background: #f8f9fa;
+            padding-left: 10px;
+            padding-right: 10px;
+            margin-left: -10px;
+            margin-right: -10px;
+        }
+
+        .alert-type {
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .alert-count {
+            font-weight: bold;
+            padding: 2px 10px;
+            border-radius: 20px;
+            background: #e7f3ff;
+            color: #4a90e2;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            overflow-x: auto;
+        }
+
+        .table-container h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .dept-header {
+            background: linear-gradient(135deg, #f0f4f8 0%, #e9ecef 100%);
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        .dept-header:hover {
+            background: linear-gradient(135deg, #e7f3ff 0%, #d4e8ff 100%);
+        }
+
+        .dept-header td {
+            padding: 15px 12px;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .dept-toggle {
+            display: inline-block;
+            margin-right: 10px;
+            transition: transform 0.3s;
+            color: #667eea;
+        }
+
+        .dept-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .faculty-row {
+            transition: all 0.3s;
+        }
+
+        .faculty-row.hidden {
+            display: none;
+        }
+
+        .dept-summary {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status-badge.full-time {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.part-time {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .positive {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .negative {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        .referral {
+            color: #17a2b8;
+            font-weight: 600;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #333;
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LaGuardia Student Alert Analysis App_V3</h1>
+        <div class="subtitle" style="text-align: center; color: #6c757d; margin-bottom: 5px;">Version 3 - Released March 1, 2026</div>
+        <div class="subtitle" style="text-align: center; color: #6c757d; margin-bottom: 20px;">Developed by Josh Goldblatt using Claude</div>
+        
+        <!-- UPLOAD SECTION -->
+        <div class="upload-section">
+            <h2>Upload Files</h2>
+            
+            <div class="file-input-wrapper">
+                <label>Faculty List (Required)</label>
+                <label for="facultyFile" class="file-input-label">Choose Faculty File</label>
+                <input type="file" id="facultyFile" accept=".csv">
+                <span id="facultyStatus" class="file-status"></span>
+                <div class="required-columns">
+                    <h3>Required Columns:</h3>
+                    <ul>
+                        <li>Faculty ID (8-digit identifier)</li>
+                        <li>Name</li>
+                        <li>Department</li>
+                        <li>Full_Part (F or P)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="file-input-wrapper">
+                <label>Referrals/Alerts Report (Required)</label>
+                <label for="alertsFile" class="file-input-label">Choose Alerts File</label>
+                <input type="file" id="alertsFile" accept=".csv">
+                <span id="alertsStatus" class="file-status"></span>
+                <div class="required-columns">
+                    <h3>Required Columns:</h3>
+                    <ul>
+                        <li>Student ID</li>
+                        <li>Referral or Alert Reasons</li>
+                        <li>Course Name</li>
+                        <li>Course Number</li>
+                        <li>Referral or Alert Created At Date</li>
+                        <li>Referral or Alert Created By</li>
+                        <li>From Progress Report (optional)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="file-input-wrapper">
+                <label>Student Report (Optional)</label>
+                <label for="studentFile" class="file-input-label">Choose Student File</label>
+                <input type="file" id="studentFile" accept=".csv">
+                <span id="studentStatus" class="file-status"></span>
+                <div class="required-columns">
+                    <h3>Required Columns:</h3>
+                    <ul>
+                        <li>Student ID</li>
+                        <li>Student Name</li>
+                        <li>Student Type (optional)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <button id="processButton" class="process-button" disabled>Process Files</button>
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-bar-fill" id="progressFill">0%</div>
+            </div>
+        </div>
+        
+        <!-- DASHBOARD SECTION -->
+        <div id="dashboard" class="dashboard-section">
+            <div class="tabs-container">
+                <div class="tabs">
+                    <button class="tab-button active" onclick="showTab('overview')">Overview</button>
+                    <button class="tab-button" onclick="showTab('students')">Student Analysis</button>
+                    <button class="tab-button" onclick="showTab('departments')">Department Analysis</button>
+                    <button class="tab-button" onclick="showTab('courses')">Course Analysis</button>
+                    <button class="tab-button" onclick="showTab('faculty')">Faculty Details</button>
+                    <button class="tab-button" onclick="showTab('validation')">Data Validation</button>
+                </div>
+                
+                <!-- OVERVIEW TAB -->
+                <div id="overview-tab" class="tab-content active">
+                    <div class="section-title">Overview Metrics</div>
+                    <div id="overviewCards" class="score-cards"></div>
+                    
+                    <div class="alert-breakdown">
+                        <h2>Alert, Feedback &amp; Referral Breakdown</h2>
+                        <div id="alertBreakdown"></div>
+                    </div>
+                </div>
+
+                <!-- STUDENTS TAB -->
+                <div id="students-tab" class="tab-content">
+                    <div class="section-title">Student Alert &amp; Feedback Analysis</div>
+                    
+                    <div id="studentOverviewCards" class="score-cards"></div>
+                    
+                    <div class="alert-breakdown">
+                        <h2>Student Alert Breakdown (Unduplicated)</h2>
+                        <div id="studentAlertBreakdown"></div>
+                    </div>
+                    
+                    <div id="advisingOfficeSection" style="display: none;">
+                        <div class="table-container" style="margin-top: 30px;">
+                            <h2>Analysis by Advising Office</h2>
+                            <table id="advisingOfficeTable">
+                                <thead>
+                                    <tr>
+                                        <th>Advising Office</th>
+                                        <th>Total Students</th>
+                                        <th>Any Alert/Feedback</th>
+                                        <th>Any Negative Alert</th>
+                                        <th>Positive Feedback</th>
+                                        <th>Referrals</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="table-container" style="margin-top: 30px;">
+                            <h2>Student Details by Advising Office</h2>
+                            <p style="color: #6c757d; margin-bottom: 15px;">
+                                Click on an Advising Office to expand/collapse student details
+                            </p>
+                            <table id="studentDetailsByOfficeTable">
+                                <thead>
+                                    <tr>
+                                        <th>Advising Office / Student</th>
+                                        <th>Student ID</th>
+                                        <th>Negative Alerts</th>
+                                        <th>Positive Feedback</th>
+                                        <th>Referrals</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="noStudentDataMessage" class="alert-breakdown" style="display: none; margin-top: 30px;">
+                        <h2>No Student File Uploaded</h2>
+                        <p style="padding: 20px; color: #6c757d;">
+                            Upload a Student File to see detailed student-level analysis including unduplicated counts 
+                            and breakdowns by student type or advising office.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- DEPARTMENTS TAB -->
+                <div id="departments-tab" class="tab-content">
+                    <div class="section-title">Department Summary</div>
+                    <div class="table-container">
+                        <h2>Department Performance Metrics</h2>
+                        <table id="deptSummaryTable">
+                            <thead>
+                                <tr>
+                                    <th>Department</th>
+                                    <th>Total Faculty</th>
+                                    <th>Submitted (%)</th>
+                                    <th>Full-Time Submitted (%)</th>
+                                    <th>Part-Time Submitted (%)</th>
+                                    <th>Total Alerts/Feedback</th>
+                                    <th>Referrals</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- COURSES TAB -->
+                <div id="courses-tab" class="tab-content">
+                    <div class="section-title">Course-Level Analysis</div>
+                    <div class="table-container">
+                        <h2>Alerts, Feedback &amp; Referrals by Course</h2>
+                        <div style="margin-bottom: 15px;">
+                            <button id="expandAllCoursesBtn" style="margin-right: 10px; padding: 8px 15px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Expand All</button>
+                            <button id="collapseAllCoursesBtn" style="padding: 8px 15px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Collapse All</button>
+                        </div>
+                        <table id="courseAnalysisTable">
+                            <thead>
+                                <tr>
+                                    <th>Department / Course</th>
+                                    <th>Course Name</th>
+                                    <th>Negative Alerts</th>
+                                    <th>Positive Feedback</th>
+                                    <th>Referrals</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- FACULTY TAB -->
+                <div id="faculty-tab" class="tab-content">
+                    <div class="section-title">Faculty Submission Details</div>
+                    <div class="table-container">
+                        <h2>Faculty Submissions by Department</h2>
+                        <div style="margin-bottom: 15px;">
+                            <button id="expandAllBtn" style="margin-right: 10px; padding: 8px 15px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Expand All</button>
+                            <button id="collapseAllBtn" style="padding: 8px 15px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Collapse All</button>
+                        </div>
+                        <table id="facultyDetailsTable">
+                            <thead>
+                                <tr>
+                                    <th>Department</th>
+                                    <th>Faculty Name</th>
+                                    <th>Status</th>
+                                    <th>Negative Alerts</th>
+                                    <th>Positive Feedback</th>
+                                    <th>Referrals</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Tutoring Center Breakdown -->
+                    <div class="table-container" style="margin-top: 30px;">
+                        <h2>Referrals by Tutoring Center</h2>
+                        <p style="color: #6c757d; margin-bottom: 15px;">
+                            Only includes referrals submitted by faculty in the Faculty List.
+                        </p>
+                        <table id="tutoringBreakdownTable">
+                            <thead>
+                                <tr>
+                                    <th>Tutoring Center</th>
+                                    <th>Number of Referrals</th>
+                                    <th>% of All Referrals</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- VALIDATION TAB -->
+                <div id="validation-tab" class="tab-content">
+                    <div class="section-title">Data Validation Report</div>
+                    
+                    <div class="score-cards" id="validationSummary" style="margin-bottom: 30px;"></div>
+                    
+                    <div class="table-container">
+                        <h2>Unmatched Faculty from Alerts</h2>
+                        <p style="color: #6c757d; margin-bottom: 15px;">
+                            These faculty members submitted alerts but are not found in the Faculty List file. 
+                            Consider adding them to the Faculty List for complete analysis.
+                        </p>
+                        <table id="unmatchedFacultyTable">
+                            <thead>
+                                <tr>
+                                    <th>Faculty Name</th>
+                                    <th>Number of Alerts Submitted</th>
+                                    <th>Courses Taught</th>
+                                    <th>Alert Types</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="table-container" style="margin-top: 30px;">
+                        <h2>Data Coverage by Department</h2>
+                        <p style="color: #6c757d; margin-bottom: 15px;">
+                            Shows the percentage of alerts that can be fully attributed to faculty in the Faculty List.
+                        </p>
+                        <table id="coverageTable">
+                            <thead>
+                                <tr>
+                                    <th>Department (by Course)</th>
+                                    <th>Total Alerts</th>
+                                    <th>Matched to Faculty List</th>
+                                    <th>Unmatched</th>
+                                    <th>Coverage Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="alert-breakdown" style="margin-top: 30px;">
+                        <h2>Impact Summary</h2>
+                        <div id="impactSummary"></div>
+                    </div>
+
+                    <div class="table-container" style="margin-top: 30px;">
+                        <h2>Referrals Excluded (Non-Faculty Submitters)</h2>
+                        <p style="color: #6c757d; margin-bottom: 15px;">
+                            These referrals were excluded because the submitter is not in the Faculty List.
+                        </p>
+                        <table id="excludedReferralsTable">
+                            <thead>
+                                <tr>
+                                    <th>Submitter Name</th>
+                                    <th>Number of Referrals</th>
+                                    <th>Tutoring Centers</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching function
+        function showTab(tabName) {
+            var tabButtons = document.querySelectorAll('.tab-button');
+            var tabContents = document.querySelectorAll('.tab-content');
+            
+            for (var i = 0; i < tabButtons.length; i++) {
+                tabButtons[i].classList.remove('active');
+            }
+            for (var i = 0; i < tabContents.length; i++) {
+                tabContents[i].classList.remove('active');
+                tabContents[i].style.display = 'none';
+            }
+            
+            var tabMap = {
+                'overview':    { tab: 'overview-tab',    btn: 0 },
+                'students':    { tab: 'students-tab',    btn: 1 },
+                'departments': { tab: 'departments-tab', btn: 2 },
+                'courses':     { tab: 'courses-tab',     btn: 3 },
+                'faculty':     { tab: 'faculty-tab',     btn: 4 },
+                'validation':  { tab: 'validation-tab',  btn: 5 }
+            };
+            
+            var info = tabMap[tabName];
+            if (info) {
+                document.getElementById(info.tab).classList.add('active');
+                document.getElementById(info.tab).style.display = 'block';
+                tabButtons[info.btn].classList.add('active');
+            }
+        }
+
+        // Global variables
+        var facultyData = null;
+        var alertsData = null;
+        var studentData = null;
+
+        // Course to Department Mapping
+        function getDepartmentFromCourse(courseNumber) {
+            if (!courseNumber) return 'Unknown';
+            
+            var prefix = courseNumber.split('-')[0].toUpperCase();
+            var mapping = {
+                'BTA': 'BAT', 'BTC': 'BAT', 'BTI': 'BAT', 'BTM': 'BAT', 'BTO': 'BAT', 'BTP': 'BAT', 'BTT': 'BAT',
+                'HSS': 'COMM HLT', 'HTR': 'COMM HLT', 'SCH': 'COMM HLT', 'SCN': 'COMM HLT',
+                'CSE': 'ELA', 'CSF': 'ELA', 'EIS': 'ELA', 'ELA': 'ELA', 'ELC': 'ELA', 'ELI': 'ELA', 'ELN': 'ELA', 'ELP': 'ELA', 'ELR': 'ELA', 'ELS': 'ELA', 'ELW': 'ELA',
+                'ENA': 'ENG', 'ENC': 'ENG', 'ENG': 'ENG', 'ENL': 'ENG', 'ENW': 'ENG',
+                'FYS': 'FYS',
+                'SCA': 'HLT SCI', 'SCL': 'HLT SCI', 'SCO': 'HLT SCI', 'SCR': 'HLT SCI', 'SCT': 'HLT SCI', 'SCV': 'HLT SCI', 'SCX': 'HLT SCI',
+                'HUA': 'HUM', 'HUC': 'HUM', 'HUI': 'HUM', 'HUM': 'HUM', 'HUN': 'HUM', 'HUP': 'HUM', 'HUT': 'HUM', 'HUV': 'HUM', 'HUW': 'HUM', 'HUX': 'HUM',
+                'LIB': 'LIBARTS', 'LIN': 'LIBARTS',
+                'MAC': 'MEC', 'MAE': 'MEC', 'MAT': 'MEC',
+                'SCB': 'NAS', 'SCC': 'NAS', 'SCD': 'NAS', 'SCE': 'NAS', 'SCG': 'NAS', 'SCP': 'NAS',
+                'SSA': 'SOC SCI', 'SSE': 'SOC SCI', 'SSH': 'SOC SCI', 'SSJ': 'SOC SCI', 'SSP': 'SOC SCI', 'SSS': 'SOC SCI', 'SSY': 'SOC SCI', 'SYF': 'SOC SCI',
+                'SSN': 'SSN',
+                'ENX': 'Other', 'FSG': 'Other', 'LRC': 'Other', 'REG': 'Other'
+            };
+            
+            return mapping[prefix] || ('Unknown (' + prefix + ')');
+        }
+
+        // ===== NEW: Smart reason splitting =====
+        // Reasons are separated by ", " but reason names themselves contain commas
+        // Each reason starts with "Alert - ", "Positive Feedback - ", or "Referral - "
+        function splitReasons(reasonsString) {
+            if (!reasonsString) return [];
+            var results = [];
+            // Split on ", " followed by a known prefix
+            var parts = reasonsString.split(/,\s*(?=Alert\s*-|Positive Feedback\s*-|Referral\s*-)/i);
+            for (var i = 0; i < parts.length; i++) {
+                var trimmed = parts[i].trim();
+                if (trimmed) results.push(trimmed);
+            }
+            return results;
+        }
+
+        // ===== NEW: Classify reason using the (Negative)/(Positive)/(Neutral) label in the data =====
+        function classifyReason(reason) {
+            // Check for explicit labels first
+            if (reason.indexOf('(Positive)') !== -1) return 'positive';
+            if (reason.indexOf('(Neutral)') !== -1) return 'referral';
+            if (reason.indexOf('(Negative)') !== -1) return 'negative';
+            // Fallback keyword detection
+            var lower = reason.toLowerCase();
+            if (lower.indexOf('referral') === 0) return 'referral';
+            if (lower.indexOf('positive feedback') !== -1 || lower.indexOf('doing well') !== -1) return 'positive';
+            return 'negative';
+        }
+
+        // ===== NEW: Extract tutoring center name from a referral reason =====
+        function getTutoringCenter(reason) {
+            // e.g. "Referral - Tutoring - Math Center (Neutral)" => "Math Center"
+            var match = reason.match(/Referral\s*-\s*Tutoring\s*-\s*([^(]+)/i);
+            if (match) return match[1].trim();
+            // Fallback: just clean it up
+            return reason.replace(/\(Neutral\)/i, '').replace(/Referral\s*-\s*/i, '').trim();
+        }
+
+        // Clean alert type for display (strip prefixes and labels)
+        function cleanAlertType(type) {
+            return type.replace(/^Alert\s*-\s*/i, '')
+                      .replace(/^Positive Feedback\s*-\s*/i, '')
+                      .replace(/^Referral\s*-\s*Tutoring\s*-\s*/i, 'Tutoring: ')
+                      .replace(/^Referral\s*-\s*/i, '')
+                      .replace(/\s*\(Negative\)\s*/i, '')
+                      .replace(/\s*\(Positive\)\s*/i, '')
+                      .replace(/\s*\(Neutral\)\s*/i, '')
+                      .trim();
+        }
+
+        // File upload handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('facultyFile').addEventListener('change', function(e) {
+                handleFileUpload(e, 'faculty');
+            });
+            document.getElementById('alertsFile').addEventListener('change', function(e) {
+                handleFileUpload(e, 'alerts');
+            });
+            document.getElementById('studentFile').addEventListener('change', function(e) {
+                handleFileUpload(e, 'student');
+            });
+            document.getElementById('processButton').addEventListener('click', processFiles);
+        });
+
+        function handleFileUpload(event, type) {
+            var file = event.target.files[0];
+            if (!file) return;
+
+            console.log('Processing file:', file.name, 'Type:', type);
+            var reader = new FileReader();
+            
+            reader.onload = function(e) {
+                var content = e.target.result;
+                var data = parseCSV(content);
+                console.log('Parsed', data.length, 'rows from', file.name);
+                
+                var statusElement;
+                if (type === 'faculty') {
+                    facultyData = data;
+                    statusElement = document.getElementById('facultyStatus');
+                } else if (type === 'alerts') {
+                    alertsData = data;
+                    statusElement = document.getElementById('alertsStatus');
+                } else if (type === 'student') {
+                    studentData = data;
+                    statusElement = document.getElementById('studentStatus');
+                }
+                
+                if (statusElement) {
+                    statusElement.textContent = '\u2713 ' + file.name + ' loaded (' + data.length + ' rows)';
+                    statusElement.className = 'file-status success';
+                }
+                
+                if (facultyData && alertsData) {
+                    document.getElementById('processButton').disabled = false;
+                }
+            };
+            
+            reader.onerror = function(e) {
+                console.error('Error reading file:', e);
+                alert('Error reading file: ' + file.name);
+            };
+            
+            reader.readAsText(file);
+        }
+
+        function parseCSV(content) {
+            var lines = [];
+            var currentLine = '';
+            var inQuotes = false;
+            
+            for (var i = 0; i < content.length; i++) {
+                var char = content[i];
+                var nextChar = content[i + 1];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                    currentLine += char;
+                } else if (char === '\n' && !inQuotes) {
+                    if (currentLine.trim()) lines.push(currentLine);
+                    currentLine = '';
+                } else if (char === '\r' && nextChar === '\n' && !inQuotes) {
+                    if (currentLine.trim()) lines.push(currentLine);
+                    currentLine = '';
+                    i++;
+                } else {
+                    currentLine += char;
+                }
+            }
+            if (currentLine.trim()) lines.push(currentLine);
+            
+            // Parse headers
+            var headers = [];
+            var headerLine = lines[0];
+            var current = '';
+            var inHeaderQuotes = false;
+            
+            for (var j = 0; j < headerLine.length; j++) {
+                var ch = headerLine[j];
+                if (ch === '"') {
+                    inHeaderQuotes = !inHeaderQuotes;
+                } else if (ch === ',' && !inHeaderQuotes) {
+                    headers.push(current.trim().replace(/^"|"$/g, '').replace(/^\uFEFF/, ''));
+                    current = '';
+                } else {
+                    current += ch;
+                }
+            }
+            headers.push(current.trim().replace(/^"|"$/g, '').replace(/^\uFEFF/, ''));
+            
+            // Parse data rows
+            var data = [];
+            for (var i = 1; i < lines.length; i++) {
+                var values = [];
+                var cur = '';
+                var inCellQuotes = false;
+                
+                for (var k = 0; k < lines[i].length; k++) {
+                    var ch2 = lines[i][k];
+                    if (ch2 === '"') {
+                        inCellQuotes = !inCellQuotes;
+                    } else if (ch2 === ',' && !inCellQuotes) {
+                        values.push(cur.trim().replace(/^"|"$/g, ''));
+                        cur = '';
+                    } else {
+                        cur += ch2;
+                    }
+                }
+                values.push(cur.trim().replace(/^"|"$/g, ''));
+                
+                var row = {};
+                for (var h = 0; h < headers.length; h++) {
+                    row[headers[h]] = values[h] || '';
+                }
+                data.push(row);
+            }
+            
+            return data;
+        }
+
+        // ===== MAIN PROCESSING =====
+        function processFiles() {
+            var progressBar = document.getElementById('progressBar');
+            var progressFill = document.getElementById('progressFill');
+            var dashboard = document.getElementById('dashboard');
+            
+            progressBar.style.display = 'block';
+            
+            function updateProgress(value) {
+                progressFill.style.width = value + '%';
+                progressFill.textContent = value + '%';
+            }
+            
+            updateProgress(10);
+            
+            // Build faculty lookup
+            var facultyByName = {};
+            for (var i = 0; i < facultyData.length; i++) {
+                var f = facultyData[i];
+                facultyByName[f['Name']] = f;
+            }
+            
+            // ===== EXPAND ALERTS: split multi-reason rows into individual entries =====
+            var expandedAlerts = [];     // Negative alerts + Positive feedback (all submitters)
+            var expandedReferrals = [];  // Referrals from faculty only
+            var excludedReferrals = [];  // Referrals from non-faculty (for validation)
+            var allExpandedItems = [];   // Everything combined for course/overview analysis
+            var tutoringCenterCounts = {};
+            
+            for (var i = 0; i < alertsData.length; i++) {
+                var row = alertsData[i];
+                var reasons = row['Referral or Alert Reasons'] || '';
+                var reasonsList = splitReasons(reasons);
+                var submitter = row['Referral or Alert Created By'] || '';
+                var isFaculty = !!facultyByName[submitter];
+                
+                for (var j = 0; j < reasonsList.length; j++) {
+                    var reason = reasonsList[j].trim();
+                    if (!reason) continue;
+                    
+                    var category = classifyReason(reason);
+                    
+                    var newRow = {};
+                    for (var key in row) {
+                        newRow[key] = row[key];
+                    }
+                    newRow['Referral or Alert Reasons'] = reason;
+                    newRow['Department'] = getDepartmentFromCourse(row['Course Number']);
+                    newRow['_category'] = category;
+                    newRow['_isFaculty'] = isFaculty;
+                    
+                    if (category === 'referral') {
+                        if (isFaculty) {
+                            expandedReferrals.push(newRow);
+                            allExpandedItems.push(newRow);
+                            var center = getTutoringCenter(reason);
+                            tutoringCenterCounts[center] = (tutoringCenterCounts[center] || 0) + 1;
+                        } else {
+                            excludedReferrals.push(newRow);
+                        }
+                    } else {
+                        // Negative and positive alerts - count from all submitters
+                        expandedAlerts.push(newRow);
+                        allExpandedItems.push(newRow);
+                    }
+                }
+            }
+            
+            console.log('Expanded alerts (neg+pos):', expandedAlerts.length);
+            console.log('Faculty referrals:', expandedReferrals.length);
+            console.log('Excluded referrals (non-faculty):', excludedReferrals.length);
+            console.log('Total items for analysis:', allExpandedItems.length);
+            
+            updateProgress(30);
+            
+            // ===== Calculate overview metrics =====
+            var uniqueFacultySubmitted = {};
+            for (var i = 0; i < alertsData.length; i++) {
+                uniqueFacultySubmitted[alertsData[i]['Referral or Alert Created By']] = true;
+            }
+            var uniqueFacultyCount = Object.keys(uniqueFacultySubmitted).length;
+            
+            var multipleAlertsSubmissions = 0;
+            for (var i = 0; i < alertsData.length; i++) {
+                var reasons = alertsData[i]['Referral or Alert Reasons'] || '';
+                if (splitReasons(reasons).length > 1) {
+                    multipleAlertsSubmissions++;
+                }
+            }
+            
+            var totalExpandedAll = allExpandedItems.length;
+            var progressReportYesAlerts = 0;
+            for (var i = 0; i < allExpandedItems.length; i++) {
+                var pr = allExpandedItems[i]['From Progress Report'];
+                if (pr && pr.toLowerCase() === 'yes') {
+                    progressReportYesAlerts++;
+                }
+            }
+            
+            var progressReportPercentage = totalExpandedAll > 0 ? 
+                ((progressReportYesAlerts / totalExpandedAll) * 100).toFixed(1) : '0.0';
+            
+            updateProgress(50);
+            
+            // Alert type counts for breakdown
+            var alertCounts = {};
+            for (var i = 0; i < allExpandedItems.length; i++) {
+                var type = cleanAlertType(allExpandedItems[i]['Referral or Alert Reasons']);
+                var cat = allExpandedItems[i]['_category'];
+                if (!alertCounts[type]) {
+                    alertCounts[type] = { count: 0, category: cat };
+                }
+                alertCounts[type].count++;
+            }
+            
+            // Faculty participation
+            var facultySubmittedSet = {};
+            for (var i = 0; i < alertsData.length; i++) {
+                facultySubmittedSet[alertsData[i]['Referral or Alert Created By']] = true;
+            }
+            
+            var fullTimeFaculty = [];
+            var partTimeFaculty = [];
+            for (var i = 0; i < facultyData.length; i++) {
+                if (facultyData[i]['Full_Part'] === 'F') {
+                    fullTimeFaculty.push(facultyData[i]);
+                } else if (facultyData[i]['Full_Part'] === 'P') {
+                    partTimeFaculty.push(facultyData[i]);
+                }
+            }
+            
+            var fullTimeSubmitted = 0;
+            for (var i = 0; i < fullTimeFaculty.length; i++) {
+                if (facultySubmittedSet[fullTimeFaculty[i]['Name']]) fullTimeSubmitted++;
+            }
+            var partTimeSubmitted = 0;
+            for (var i = 0; i < partTimeFaculty.length; i++) {
+                if (facultySubmittedSet[partTimeFaculty[i]['Name']]) partTimeSubmitted++;
+            }
+            
+            var studentWithAlertPercentage = 'N/A';
+            if (studentData) {
+                var studentsWithAlerts = {};
+                for (var i = 0; i < allExpandedItems.length; i++) {
+                    studentsWithAlerts[allExpandedItems[i]['Student ID']] = true;
+                }
+                var studentsWithAlertsCount = Object.keys(studentsWithAlerts).length;
+                var pct = (studentsWithAlertsCount / studentData.length * 100).toFixed(1);
+                studentWithAlertPercentage = pct + '% (' + studentsWithAlertsCount + '/' + studentData.length + ')';
+            }
+            
+            updateProgress(70);
+            
+            // ===== Department analysis =====
+            var deptAnalysis = {};
+            
+            for (var i = 0; i < facultyData.length; i++) {
+                var faculty = facultyData[i];
+                var dept = faculty['Department'];
+                if (!deptAnalysis[dept]) {
+                    deptAnalysis[dept] = {
+                        totalFaculty: 0, fullTime: 0, partTime: 0,
+                        submitted: {}, fullTimeSubmitted: {}, partTimeSubmitted: {},
+                        facultyDetails: {}
+                    };
+                }
+                deptAnalysis[dept].totalFaculty++;
+                if (faculty['Full_Part'] === 'F') {
+                    deptAnalysis[dept].fullTime++;
+                } else {
+                    deptAnalysis[dept].partTime++;
+                }
+            }
+            
+            // Process alerts + referrals into department analysis
+            for (var i = 0; i < allExpandedItems.length; i++) {
+                var alert = allExpandedItems[i];
+                var facultyName = alert['Referral or Alert Created By'];
+                var faculty = facultyByName[facultyName];
+                if (!faculty) continue;
+                
+                var dept = faculty['Department'];
+                var cat = alert['_category'];
+                
+                if (!deptAnalysis[dept]) continue;
+                
+                deptAnalysis[dept].submitted[facultyName] = true;
+                
+                if (faculty['Full_Part'] === 'F') {
+                    deptAnalysis[dept].fullTimeSubmitted[facultyName] = true;
+                } else {
+                    deptAnalysis[dept].partTimeSubmitted[facultyName] = true;
+                }
+                
+                if (!deptAnalysis[dept].facultyDetails[facultyName]) {
+                    deptAnalysis[dept].facultyDetails[facultyName] = {
+                        negative: 0, positive: 0, referral: 0, total: 0
+                    };
+                }
+                
+                if (cat === 'positive') {
+                    deptAnalysis[dept].facultyDetails[facultyName].positive++;
+                } else if (cat === 'referral') {
+                    deptAnalysis[dept].facultyDetails[facultyName].referral++;
+                } else {
+                    deptAnalysis[dept].facultyDetails[facultyName].negative++;
+                }
+                deptAnalysis[dept].facultyDetails[facultyName].total++;
+            }
+            
+            updateProgress(90);
+            
+            // ===== RENDER ALL SECTIONS =====
+            renderOverviewCards(
+                uniqueFacultyCount, multipleAlertsSubmissions, alertsData.length,
+                progressReportPercentage, progressReportYesAlerts, totalExpandedAll,
+                Object.keys(facultySubmittedSet).length, facultyData.length,
+                fullTimeSubmitted, fullTimeFaculty.length,
+                partTimeSubmitted, partTimeFaculty.length,
+                studentWithAlertPercentage,
+                expandedReferrals.length
+            );
+            
+            renderAlertBreakdown(alertCounts);
+            renderDepartmentTables(deptAnalysis);
+            renderCourseAnalysis(allExpandedItems);
+            renderValidationReport(allExpandedItems, facultyByName, excludedReferrals);
+            renderTutoringBreakdown(tutoringCenterCounts);
+            renderStudentAnalysis(allExpandedItems, studentData);
+            
+            updateProgress(100);
+            
+            setTimeout(function() {
+                progressBar.style.display = 'none';
+                dashboard.style.display = 'block';
+                showTab('overview');
+            }, 500);
+        }
+
+        // ===== RENDER: Overview Cards =====
+        function renderOverviewCards(uniqueFaculty, multipleAlerts, totalSubmissions, progressPercentage, progressYes, totalAlerts,
+                                    facultySubmitted, totalFaculty, ftSubmitted, ftTotal, ptSubmitted, ptTotal, studentPercent, referralCount) {
+            var cards = [
+                { title: 'Unique Faculty Submitted', value: uniqueFaculty, detail: 'Individual faculty members who submitted' },
+                { title: 'Multiple Alerts/Feedback', value: ((multipleAlerts/totalSubmissions)*100).toFixed(1) + '%', detail: multipleAlerts + ' of ' + totalSubmissions + ' submissions' },
+                { title: 'Via Progress Report', value: progressPercentage + '%', detail: progressYes + ' of ' + totalAlerts + ' alerts/feedback/referrals' },
+                { title: 'Overall Faculty Participation', value: ((facultySubmitted/totalFaculty)*100).toFixed(1) + '%', detail: facultySubmitted + ' of ' + totalFaculty + ' faculty' },
+                { title: 'Full-Time Participation', value: ((ftSubmitted/ftTotal)*100).toFixed(1) + '%', detail: ftSubmitted + ' of ' + ftTotal + ' full-time' },
+                { title: 'Part-Time Participation', value: ((ptSubmitted/ptTotal)*100).toFixed(1) + '%', detail: ptSubmitted + ' of ' + ptTotal + ' part-time' },
+                { title: 'Faculty Referrals', value: referralCount, detail: 'Tutoring referrals by faculty' }
+            ];
+            
+            if (studentData) {
+                cards.push({
+                    title: 'Students with Alerts',
+                    value: studentPercent.split(' ')[0],
+                    detail: studentPercent.split(' ')[1] ? studentPercent.split(' ')[1].replace(/[()]/g, '') : ''
+                });
+            }
+            
+            var container = document.getElementById('overviewCards');
+            var html = '';
+            for (var i = 0; i < cards.length; i++) {
+                html += '<div class="score-card"><h3>' + cards[i].title + '</h3>' +
+                    '<div class="value">' + cards[i].value + '</div>' +
+                    '<div class="detail">' + cards[i].detail + '</div></div>';
+            }
+            container.innerHTML = html;
+        }
+
+        // ===== RENDER: Alert Breakdown =====
+        function renderAlertBreakdown(alertCounts) {
+            var container = document.getElementById('alertBreakdown');
+            
+            // Group by category
+            var negatives = [], positives = [], referrals = [];
+            for (var type in alertCounts) {
+                var item = { type: type, count: alertCounts[type].count, category: alertCounts[type].category };
+                if (item.category === 'positive') positives.push(item);
+                else if (item.category === 'referral') referrals.push(item);
+                else negatives.push(item);
+            }
+            
+            negatives.sort(function(a,b){ return b.count - a.count; });
+            positives.sort(function(a,b){ return b.count - a.count; });
+            referrals.sort(function(a,b){ return b.count - a.count; });
+            
+            var html = '';
+            var grandTotal = 0;
+            
+            // Negative section
+            var negTotal = 0;
+            html += '<div style="font-weight: bold; color: #dc3545; padding: 10px 0 5px; border-bottom: 2px solid #dc3545; margin-bottom: 5px;">NEGATIVE ALERTS</div>';
+            for (var i = 0; i < negatives.length; i++) {
+                negTotal += negatives[i].count;
+                html += '<div class="alert-item"><span class="alert-type negative" style="padding-left: 15px;">' + negatives[i].type + '</span>' +
+                    '<span class="alert-count">' + negatives[i].count + '</span></div>';
+            }
+            html += '<div class="alert-item" style="font-weight: bold; background: #fff5f5;"><span class="alert-type" style="padding-left: 15px;">Subtotal Negative</span>' +
+                '<span class="alert-count" style="background: #dc354520; color: #dc3545;">' + negTotal + '</span></div>';
+            grandTotal += negTotal;
+            
+            // Positive section
+            var posTotal = 0;
+            html += '<div style="font-weight: bold; color: #28a745; padding: 10px 0 5px; border-bottom: 2px solid #28a745; margin-bottom: 5px; margin-top: 15px;">POSITIVE FEEDBACK</div>';
+            for (var i = 0; i < positives.length; i++) {
+                posTotal += positives[i].count;
+                html += '<div class="alert-item"><span class="alert-type positive" style="padding-left: 15px;">' + positives[i].type + '</span>' +
+                    '<span class="alert-count">' + positives[i].count + '</span></div>';
+            }
+            html += '<div class="alert-item" style="font-weight: bold; background: #f0fff0;"><span class="alert-type" style="padding-left: 15px;">Subtotal Positive</span>' +
+                '<span class="alert-count" style="background: #28a74520; color: #28a745;">' + posTotal + '</span></div>';
+            grandTotal += posTotal;
+            
+            // Referrals section
+            var refTotal = 0;
+            html += '<div style="font-weight: bold; color: #17a2b8; padding: 10px 0 5px; border-bottom: 2px solid #17a2b8; margin-bottom: 5px; margin-top: 15px;">REFERRALS (Faculty Only)</div>';
+            for (var i = 0; i < referrals.length; i++) {
+                refTotal += referrals[i].count;
+                html += '<div class="alert-item"><span class="alert-type referral" style="padding-left: 15px;">' + referrals[i].type + '</span>' +
+                    '<span class="alert-count">' + referrals[i].count + '</span></div>';
+            }
+            html += '<div class="alert-item" style="font-weight: bold; background: #f0fafc;"><span class="alert-type" style="padding-left: 15px;">Subtotal Referrals</span>' +
+                '<span class="alert-count" style="background: #17a2b820; color: #17a2b8;">' + refTotal + '</span></div>';
+            grandTotal += refTotal;
+            
+            // Grand total
+            html += '<div class="alert-item" style="margin-top: 15px; padding-top: 15px; border-top: 3px solid #333; font-weight: bold;">' +
+                '<span class="alert-type" style="font-size: 1.1em;">GRAND TOTAL</span>' +
+                '<span class="alert-count" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-size: 1.1em;">' + grandTotal + '</span></div>';
+            
+            container.innerHTML = html;
+        }
+
+        // ===== RENDER: Department Tables =====
+        function renderDepartmentTables(deptAnalysis) {
+            var topDeptNames = [
+                'Business and Technology', 'Community Health and Wellness', 'Education & Language Acquisiti',
+                'English', 'Health Science', 'Humanities', 'Math, Engineering & Comp Sci', 'Natural Sciences', 'Social Science'
+            ];
+
+            var summaryBody = document.querySelector('#deptSummaryTable tbody');
+            summaryBody.innerHTML = '';
+
+            var topGroup = [], otherGroup = [];
+
+            for (var dept in deptAnalysis) {
+                var data = deptAnalysis[dept];
+                var totalAlerts = 0, totalReferrals = 0;
+                for (var fac in data.facultyDetails) {
+                    var c = data.facultyDetails[fac];
+                    totalAlerts += (c.negative || 0) + (c.positive || 0);
+                    totalReferrals += (c.referral || 0);
+                }
+                var info = { name: dept, data: data, totalAlerts: totalAlerts, totalReferrals: totalReferrals };
+                if (topDeptNames.indexOf(dept) !== -1) topGroup.push(info);
+                else otherGroup.push(info);
+            }
+
+            topGroup.sort(function(a, b) { return topDeptNames.indexOf(a.name) - topDeptNames.indexOf(b.name); });
+            otherGroup.sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+            function initTotals() {
+                return { faculty: 0, submitted: 0, fullTimeSubmitted: 0, fullTime: 0, partTimeSubmitted: 0, partTime: 0, alerts: 0, referrals: 0 };
+            }
+            var topTotals = initTotals(), otherTotals = initTotals();
+
+            function appendRow(info) {
+                var data = info.data;
+                var sc = Object.keys(data.submitted).length;
+                var ftsc = Object.keys(data.fullTimeSubmitted).length;
+                var ptsc = Object.keys(data.partTimeSubmitted).length;
+                var sp = data.totalFaculty > 0 ? ((sc / data.totalFaculty) * 100).toFixed(1) : '0.0';
+                var ftp = data.fullTime > 0 ? ((ftsc / data.fullTime) * 100).toFixed(1) : '0.0';
+                var ptp = data.partTime > 0 ? ((ptsc / data.partTime) * 100).toFixed(1) : '0.0';
+
+                var row = summaryBody.insertRow();
+                row.innerHTML = '<td>' + info.name + '</td><td>' + data.totalFaculty + '</td>' +
+                    '<td>' + sc + ' (' + sp + '%)</td><td>' + ftsc + ' (' + ftp + '%)</td>' +
+                    '<td>' + ptsc + ' (' + ptp + '%)</td><td>' + info.totalAlerts + '</td>' +
+                    '<td style="color: #17a2b8; font-weight: 600;">' + info.totalReferrals + '</td>';
+                return { sc: sc, ftsc: ftsc, ptsc: ptsc };
+            }
+
+            function addSubtotalRow(label, totals, bg) {
+                var sp = totals.faculty > 0 ? ((totals.submitted / totals.faculty) * 100).toFixed(1) : '0.0';
+                var ftp = totals.fullTime > 0 ? ((totals.fullTimeSubmitted / totals.fullTime) * 100).toFixed(1) : '0.0';
+                var ptp = totals.partTime > 0 ? ((totals.partTimeSubmitted / totals.partTime) * 100).toFixed(1) : '0.0';
+
+                var r = summaryBody.insertRow();
+                r.style.backgroundColor = bg || '#f0f4f8';
+                r.style.fontWeight = 'bold';
+                r.innerHTML = '<td style="font-style: italic;">' + label + '</td><td>' + totals.faculty + '</td>' +
+                    '<td>' + totals.submitted + ' (' + sp + '%)</td><td>' + totals.fullTimeSubmitted + ' (' + ftp + '%)</td>' +
+                    '<td>' + totals.partTimeSubmitted + ' (' + ptp + '%)</td><td>' + totals.alerts + '</td>' +
+                    '<td style="color: #17a2b8;">' + totals.referrals + '</td>';
+            }
+
+            function processGroup(group, totals) {
+                for (var i = 0; i < group.length; i++) {
+                    var info = group[i];
+                    var counts = appendRow(info);
+                    totals.faculty += info.data.totalFaculty;
+                    totals.submitted += counts.sc;
+                    totals.fullTimeSubmitted += counts.ftsc;
+                    totals.fullTime += info.data.fullTime;
+                    totals.partTimeSubmitted += counts.ptsc;
+                    totals.partTime += info.data.partTime;
+                    totals.alerts += info.totalAlerts;
+                    totals.referrals += info.totalReferrals;
+                }
+            }
+
+            processGroup(topGroup, topTotals);
+            if (topGroup.length > 0) addSubtotalRow('Subtotal (Selected Departments)', topTotals, '#f0f4f8');
+            processGroup(otherGroup, otherTotals);
+            if (otherGroup.length > 0) addSubtotalRow('Subtotal (Other Departments)', otherTotals, '#f9f9fb');
+
+            // Grand total
+            var grand = initTotals();
+            for (var k in grand) { grand[k] = topTotals[k] + otherTotals[k]; }
+            var gsp = grand.faculty > 0 ? ((grand.submitted / grand.faculty) * 100).toFixed(1) : '0.0';
+            var gftp = grand.fullTime > 0 ? ((grand.fullTimeSubmitted / grand.fullTime) * 100).toFixed(1) : '0.0';
+            var gptp = grand.partTime > 0 ? ((grand.partTimeSubmitted / grand.partTime) * 100).toFixed(1) : '0.0';
+
+            var gr = summaryBody.insertRow();
+            gr.style.backgroundColor = '#e7f3ff';
+            gr.style.fontWeight = 'bold';
+            gr.style.borderTop = '2px solid #4a90e2';
+            gr.innerHTML = '<td>GRAND TOTAL</td><td>' + grand.faculty + '</td>' +
+                '<td>' + grand.submitted + ' (' + gsp + '%)</td><td>' + grand.fullTimeSubmitted + ' (' + gftp + '%)</td>' +
+                '<td>' + grand.partTimeSubmitted + ' (' + gptp + '%)</td><td>' + grand.alerts + '</td>' +
+                '<td style="color: #17a2b8;">' + grand.referrals + '</td>';
+
+            renderFacultyDetailsTable(deptAnalysis, topDeptNames);
+        }
+
+        // ===== RENDER: Faculty Details =====
+        function renderFacultyDetailsTable(deptAnalysis, topDeptNames) {
+            var detailsBody = document.querySelector('#facultyDetailsTable tbody');
+            detailsBody.innerHTML = '';
+
+            var facultyByDept = {};
+            for (var dept in deptAnalysis) {
+                var data = deptAnalysis[dept];
+                if (!facultyByDept[dept]) facultyByDept[dept] = [];
+                for (var fn in data.facultyDetails) {
+                    var counts = data.facultyDetails[fn];
+                    var fi = null;
+                    for (var i = 0; i < facultyData.length; i++) {
+                        if (facultyData[i]['Name'] === fn) { fi = facultyData[i]; break; }
+                    }
+                    facultyByDept[dept].push({
+                        faculty: fn, status: fi ? fi['Full_Part'] : 'Unknown',
+                        counts: counts, total: counts.total || 0
+                    });
+                }
+            }
+
+            var presentTop = [], others = [];
+            for (var i = 0; i < topDeptNames.length; i++) {
+                if (facultyByDept[topDeptNames[i]]) presentTop.push(topDeptNames[i]);
+            }
+            for (var d in facultyByDept) {
+                if (topDeptNames.indexOf(d) === -1) others.push(d);
+            }
+            others.sort();
+
+            function addDeptBlock(deptList, subtotalsLabel, addSubtotal) {
+                var bt = { negative: 0, positive: 0, referral: 0, total: 0 };
+
+                for (var di = 0; di < deptList.length; di++) {
+                    var dept = deptList[di];
+                    var list = facultyByDept[dept];
+                    list.sort(function(a, b) { return b.total - a.total; });
+
+                    var dt = { negative: 0, positive: 0, referral: 0, total: 0 };
+                    for (var k = 0; k < list.length; k++) {
+                        dt.negative += list[k].counts.negative || 0;
+                        dt.positive += list[k].counts.positive || 0;
+                        dt.referral += list[k].counts.referral || 0;
+                        dt.total += list[k].counts.total || 0;
+                    }
+
+                    var hr = detailsBody.insertRow();
+                    hr.className = 'dept-header';
+                    var idx = document.querySelectorAll('#facultyDetailsTable .dept-header').length - 1;
+                    hr.innerHTML = '<td colspan="7"><span class="dept-toggle" id="ftoggle-' + idx + '">&#9660;</span>' +
+                        '<strong>' + dept + '</strong><span class="dept-summary">(' + list.length + ' faculty, ' + dt.total + ' total)</span></td>';
+                    hr.onclick = (function(toggleIdx) {
+                        return function() {
+                            var t = document.getElementById('ftoggle-' + toggleIdx);
+                            var rows = this.parentNode.querySelectorAll ? document.querySelectorAll('.frow-' + toggleIdx) : [];
+                            if (t.classList.contains('collapsed')) {
+                                t.classList.remove('collapsed');
+                                for (var i = 0; i < rows.length; i++) rows[i].classList.remove('hidden');
+                            } else {
+                                t.classList.add('collapsed');
+                                for (var i = 0; i < rows.length; i++) rows[i].classList.add('hidden');
+                            }
+                        };
+                    })(idx);
+
+                    for (var r = 0; r < list.length; r++) {
+                        var item = list[r];
+                        var row = detailsBody.insertRow();
+                        row.className = 'faculty-row frow-' + idx;
+                        var badge = (item.status === 'F') ? '<span class="status-badge full-time">Full-time</span>' :
+                                   (item.status === 'P') ? '<span class="status-badge part-time">Part-time</span>' :
+                                   '<span class="status-badge">Unknown</span>';
+                        row.innerHTML = '<td style="padding-left: 40px;">' + dept + '</td>' +
+                            '<td>' + item.faculty + '</td><td>' + badge + '</td>' +
+                            '<td>' + (item.counts.negative || 0) + '</td>' +
+                            '<td class="positive">' + (item.counts.positive || 0) + '</td>' +
+                            '<td class="referral">' + (item.counts.referral || 0) + '</td>' +
+                            '<td><strong>' + item.total + '</strong></td>';
+                    }
+
+                    bt.negative += dt.negative; bt.positive += dt.positive;
+                    bt.referral += dt.referral; bt.total += dt.total;
+                }
+
+                if (addSubtotal && deptList.length > 0) {
+                    var sub = detailsBody.insertRow();
+                    sub.style.backgroundColor = '#f0f4f8';
+                    sub.style.fontWeight = 'bold';
+                    sub.innerHTML = '<td colspan="3" style="font-style: italic;">' + subtotalsLabel + '</td>' +
+                        '<td>' + bt.negative + '</td><td class="positive">' + bt.positive + '</td>' +
+                        '<td class="referral">' + bt.referral + '</td><td>' + bt.total + '</td>';
+                }
+                return bt;
+            }
+
+            var topBT = addDeptBlock(presentTop, 'Subtotal (Selected Departments)', true);
+            var otherBT = addDeptBlock(others, 'Subtotal (Other Departments)', true);
+
+            var grandRow = detailsBody.insertRow();
+            grandRow.style.backgroundColor = '#e7f3ff';
+            grandRow.style.fontWeight = 'bold';
+            grandRow.style.borderTop = '2px solid #4a90e2';
+            grandRow.innerHTML = '<td colspan="3">GRAND TOTAL</td>' +
+                '<td>' + (topBT.negative + otherBT.negative) + '</td>' +
+                '<td class="positive">' + (topBT.positive + otherBT.positive) + '</td>' +
+                '<td class="referral">' + (topBT.referral + otherBT.referral) + '</td>' +
+                '<td>' + (topBT.total + otherBT.total) + '</td>';
+
+            // Expand/Collapse controls
+            setTimeout(function() {
+                var expandBtn = document.getElementById('expandAllBtn');
+                var collapseBtn = document.getElementById('collapseAllBtn');
+                if (expandBtn) {
+                    expandBtn.onclick = function() {
+                        var toggles = document.querySelectorAll('[id^="ftoggle-"]');
+                        var rows = document.querySelectorAll('[class*="frow-"]');
+                        for (var i = 0; i < toggles.length; i++) toggles[i].classList.remove('collapsed');
+                        for (var i = 0; i < rows.length; i++) rows[i].classList.remove('hidden');
+                    };
+                }
+                if (collapseBtn) {
+                    collapseBtn.onclick = function() {
+                        var toggles = document.querySelectorAll('[id^="ftoggle-"]');
+                        var rows = document.querySelectorAll('[class*="frow-"]');
+                        for (var i = 0; i < toggles.length; i++) toggles[i].classList.add('collapsed');
+                        for (var i = 0; i < rows.length; i++) rows[i].classList.add('hidden');
+                    };
+                }
+            }, 100);
+        }
+
+        // ===== RENDER: Tutoring Breakdown =====
+        function renderTutoringBreakdown(tutoringCenterCounts) {
+            var tableBody = document.querySelector('#tutoringBreakdownTable tbody');
+            tableBody.innerHTML = '';
+            
+            var sorted = [];
+            var totalRef = 0;
+            for (var center in tutoringCenterCounts) {
+                sorted.push({ center: center, count: tutoringCenterCounts[center] });
+                totalRef += tutoringCenterCounts[center];
+            }
+            sorted.sort(function(a, b) { return b.count - a.count; });
+            
+            for (var i = 0; i < sorted.length; i++) {
+                var row = tableBody.insertRow();
+                var pct = totalRef > 0 ? ((sorted[i].count / totalRef) * 100).toFixed(1) : '0.0';
+                row.innerHTML = '<td>' + sorted[i].center + '</td>' +
+                    '<td style="text-align: center; font-weight: 600; color: #17a2b8;">' + sorted[i].count + '</td>' +
+                    '<td style="text-align: center;">' + pct + '%</td>';
+            }
+            
+            if (sorted.length > 0) {
+                var totalRow = tableBody.insertRow();
+                totalRow.style.backgroundColor = '#e7f3ff';
+                totalRow.style.fontWeight = 'bold';
+                totalRow.style.borderTop = '2px solid #4a90e2';
+                totalRow.innerHTML = '<td>TOTAL</td><td style="text-align: center;">' + totalRef + '</td><td style="text-align: center;">100.0%</td>';
+            } else {
+                var emptyRow = tableBody.insertRow();
+                emptyRow.innerHTML = '<td colspan="3" style="text-align: center; color: #6c757d;">No faculty referrals found</td>';
+            }
+        }
+
+        // ===== RENDER: Course Analysis =====
+        function renderCourseAnalysis(allExpandedItems) {
+            var priorityDepts = ['BAT', 'COMM HLT', 'ELA', 'ENG', 'FYS', 'HLT SCI', 'HUM', 'LIBARTS', 'MEC', 'NAS', 'SOC SCI', 'SSN', 'Other'];
+            
+            var courseData = {};
+            
+            for (var i = 0; i < allExpandedItems.length; i++) {
+                var alert = allExpandedItems[i];
+                var dept = getDepartmentFromCourse(alert['Course Number']);
+                var courseNum = alert['Course Number'] || 'No Course Number';
+                var courseName = alert['Course Name'] || 'No Course Name';
+                var cat = alert['_category'];
+                
+                if (!alert['Course Number'] || alert['Course Number'] === '') {
+                    dept = 'Unknown (No Course Info)';
+                    courseNum = 'N/A - ' + alert['Referral or Alert Created By'] + ' - ' + 
+                                (alert['Referral or Alert Created At Date'] || 'No Date');
+                    courseName = 'Alert/Feedback without course assignment';
+                }
+                
+                if (!courseData[dept]) courseData[dept] = {};
+                if (!courseData[dept][courseNum]) {
+                    courseData[dept][courseNum] = { courseName: courseName, positive: 0, negative: 0, referral: 0, total: 0 };
+                }
+                
+                if (cat === 'positive') courseData[dept][courseNum].positive++;
+                else if (cat === 'referral') courseData[dept][courseNum].referral++;
+                else courseData[dept][courseNum].negative++;
+                courseData[dept][courseNum].total++;
+            }
+            
+            var sortedDepts = [];
+            for (var i = 0; i < priorityDepts.length; i++) {
+                if (courseData[priorityDepts[i]]) sortedDepts.push(priorityDepts[i]);
+            }
+            var otherDepts = [];
+            for (var dept in courseData) {
+                if (priorityDepts.indexOf(dept) === -1) otherDepts.push(dept);
+            }
+            otherDepts.sort(function(a, b) {
+                var aU = a.indexOf('Unknown') === 0, bU = b.indexOf('Unknown') === 0;
+                if (aU && !bU) return 1;
+                if (!aU && bU) return -1;
+                return a.localeCompare(b);
+            });
+            for (var i = 0; i < otherDepts.length; i++) sortedDepts.push(otherDepts[i]);
+            
+            var tableBody = document.querySelector('#courseAnalysisTable tbody');
+            tableBody.innerHTML = '';
+            
+            for (var deptIndex = 0; deptIndex < sortedDepts.length; deptIndex++) {
+                var dept = sortedDepts[deptIndex];
+                var courses = courseData[dept];
+                var deptTotals = { positive: 0, negative: 0, referral: 0, total: 0 };
+                var courseList = [];
+                
+                for (var cn in courses) {
+                    var c = courses[cn];
+                    deptTotals.positive += c.positive;
+                    deptTotals.negative += c.negative;
+                    deptTotals.referral += c.referral;
+                    deptTotals.total += c.total;
+                    courseList.push({ courseNum: cn, courseName: c.courseName, positive: c.positive, negative: c.negative, referral: c.referral, total: c.total });
+                }
+                courseList.sort(function(a, b) { return a.courseNum.localeCompare(b.courseNum); });
+                
+                var headerRow = tableBody.insertRow();
+                headerRow.className = 'dept-header';
+                headerRow.setAttribute('data-course-dept-index', deptIndex);
+                
+                headerRow.innerHTML = '<td colspan="6"><span class="dept-toggle" id="course-toggle-' + deptIndex + '">&#9660;</span>' +
+                    '<strong>' + dept + '</strong><span class="dept-summary" style="margin-left: 20px;">' +
+                    'Courses: ' + courseList.length + ' | ' +
+                    'Neg: <span style="color: #dc3545; font-weight: bold;">' + deptTotals.negative + '</span> | ' +
+                    'Pos: <span style="color: #28a745; font-weight: bold;">' + deptTotals.positive + '</span> | ' +
+                    'Ref: <span style="color: #17a2b8; font-weight: bold;">' + deptTotals.referral + '</span> | ' +
+                    'Total: ' + deptTotals.total + '</span></td>';
+                
+                headerRow.onclick = (function(idx) {
+                    return function() {
+                        var toggle = document.getElementById('course-toggle-' + idx);
+                        var rows = document.querySelectorAll('.course-dept-' + idx);
+                        if (toggle.classList.contains('collapsed')) {
+                            toggle.classList.remove('collapsed');
+                            for (var i = 0; i < rows.length; i++) rows[i].classList.remove('hidden');
+                        } else {
+                            toggle.classList.add('collapsed');
+                            for (var i = 0; i < rows.length; i++) rows[i].classList.add('hidden');
+                        }
+                    };
+                })(deptIndex);
+                
+                for (var i = 0; i < courseList.length; i++) {
+                    var course = courseList[i];
+                    var row = tableBody.insertRow();
+                    row.className = 'faculty-row course-dept-' + deptIndex;
+                    row.innerHTML = '<td style="padding-left: 40px;"><strong>' + course.courseNum + '</strong></td>' +
+                        '<td>' + course.courseName + '</td>' +
+                        '<td style="color: #dc3545; font-weight: 600;">' + course.negative + '</td>' +
+                        '<td style="color: #28a745; font-weight: 600;">' + course.positive + '</td>' +
+                        '<td style="color: #17a2b8; font-weight: 600;">' + course.referral + '</td>' +
+                        '<td><strong>' + course.total + '</strong></td>';
+                }
+            }
+            
+            // Grand total
+            var gt = { positive: 0, negative: 0, referral: 0, total: 0 };
+            for (var d in courseData) {
+                for (var cn in courseData[d]) {
+                    var c = courseData[d][cn];
+                    gt.positive += c.positive; gt.negative += c.negative;
+                    gt.referral += c.referral; gt.total += c.total;
+                }
+            }
+            var grandRow = tableBody.insertRow();
+            grandRow.style.backgroundColor = '#e7f3ff';
+            grandRow.style.fontWeight = 'bold';
+            grandRow.style.borderTop = '2px solid #4a90e2';
+            grandRow.innerHTML = '<td colspan="2">GRAND TOTAL</td>' +
+                '<td style="color: #dc3545;">' + gt.negative + '</td>' +
+                '<td style="color: #28a745;">' + gt.positive + '</td>' +
+                '<td style="color: #17a2b8;">' + gt.referral + '</td>' +
+                '<td>' + gt.total + '</td>';
+            
+            // Expand/Collapse
+            setTimeout(function() {
+                var expandBtn = document.getElementById('expandAllCoursesBtn');
+                var collapseBtn = document.getElementById('collapseAllCoursesBtn');
+                if (expandBtn) {
+                    expandBtn.onclick = function() {
+                        var t = document.querySelectorAll('[id^="course-toggle-"]');
+                        var r = document.querySelectorAll('[class*="course-dept-"]');
+                        for (var i = 0; i < t.length; i++) t[i].classList.remove('collapsed');
+                        for (var i = 0; i < r.length; i++) r[i].classList.remove('hidden');
+                    };
+                }
+                if (collapseBtn) {
+                    collapseBtn.onclick = function() {
+                        var t = document.querySelectorAll('[id^="course-toggle-"]');
+                        var r = document.querySelectorAll('[class*="course-dept-"]');
+                        for (var i = 0; i < t.length; i++) t[i].classList.add('collapsed');
+                        for (var i = 0; i < r.length; i++) r[i].classList.add('hidden');
+                    };
+                }
+            }, 100);
+        }
+
+        // ===== RENDER: Validation Report =====
+        function renderValidationReport(allExpandedItems, facultyByName, excludedReferrals) {
+            var unmatchedFaculty = {};
+            var matchedCount = 0, unmatchedCount = 0;
+            var deptCoverage = {};
+            
+            for (var i = 0; i < allExpandedItems.length; i++) {
+                var alert = allExpandedItems[i];
+                var fn = alert['Referral or Alert Created By'];
+                var dept = getDepartmentFromCourse(alert['Course Number']);
+                var at = cleanAlertType(alert['Referral or Alert Reasons']);
+                
+                if (!deptCoverage[dept]) deptCoverage[dept] = { total: 0, matched: 0, unmatched: 0 };
+                deptCoverage[dept].total++;
+                
+                if (facultyByName[fn]) {
+                    matchedCount++;
+                    deptCoverage[dept].matched++;
+                } else {
+                    unmatchedCount++;
+                    deptCoverage[dept].unmatched++;
+                    if (!unmatchedFaculty[fn]) unmatchedFaculty[fn] = { count: 0, courses: {}, alertTypes: {} };
+                    unmatchedFaculty[fn].count++;
+                    unmatchedFaculty[fn].courses[alert['Course Number']] = true;
+                    unmatchedFaculty[fn].alertTypes[at] = (unmatchedFaculty[fn].alertTypes[at] || 0) + 1;
+                }
+            }
+            
+            var totalAlerts = allExpandedItems.length;
+            var coverageRate = totalAlerts > 0 ? ((matchedCount / totalAlerts) * 100).toFixed(1) : 0;
+            var unmatchedFacultyCount = Object.keys(unmatchedFaculty).length;
+            var totalFacultyInAlerts = Object.keys(facultyByName).length + unmatchedFacultyCount;
+            
+            // Summary cards
+            var summaryContainer = document.getElementById('validationSummary');
+            var cards = [
+                { title: 'Data Coverage Rate', value: coverageRate + '%', detail: matchedCount + ' of ' + totalAlerts + ' matched',
+                  color: parseFloat(coverageRate) >= 90 ? '#28a745' : parseFloat(coverageRate) >= 70 ? '#ffc107' : '#dc3545' },
+                { title: 'Unmatched Faculty', value: unmatchedFacultyCount, detail: 'Not in Faculty List file',
+                  color: unmatchedFacultyCount === 0 ? '#28a745' : unmatchedFacultyCount <= 5 ? '#ffc107' : '#dc3545' },
+                { title: 'Unmatched Alerts', value: unmatchedCount, detail: 'Cannot determine department/status',
+                  color: unmatchedCount === 0 ? '#28a745' : unmatchedCount <= 20 ? '#ffc107' : '#dc3545' },
+                { title: 'Faculty File Completeness', value: ((Object.keys(facultyByName).length / Math.max(totalFacultyInAlerts, 1)) * 100).toFixed(1) + '%',
+                  detail: Object.keys(facultyByName).length + ' of ' + totalFacultyInAlerts + ' faculty', color: '#4a90e2' },
+                { title: 'Excluded Referrals', value: excludedReferrals.length, detail: 'Non-faculty referrals filtered out',
+                  color: excludedReferrals.length === 0 ? '#28a745' : '#17a2b8' }
+            ];
+            
+            var html = '';
+            for (var i = 0; i < cards.length; i++) {
+                html += '<div class="score-card" style="border-left-color: ' + cards[i].color + ';"><h3>' + cards[i].title + '</h3>' +
+                    '<div class="value" style="color: ' + cards[i].color + ';">' + cards[i].value + '</div>' +
+                    '<div class="detail">' + cards[i].detail + '</div></div>';
+            }
+            summaryContainer.innerHTML = html;
+            
+            // Unmatched faculty table
+            var unmatchedTable = document.querySelector('#unmatchedFacultyTable tbody');
+            unmatchedTable.innerHTML = '';
+            var unmatchedList = [];
+            for (var name in unmatchedFaculty) unmatchedList.push({ name: name, data: unmatchedFaculty[name] });
+            unmatchedList.sort(function(a, b) { return b.data.count - a.data.count; });
+            
+            if (unmatchedList.length === 0) {
+                var row = unmatchedTable.insertRow();
+                row.innerHTML = '<td colspan="4" style="text-align: center; color: #28a745; font-weight: bold;">All faculty in alerts are found in the Faculty List file</td>';
+            } else {
+                for (var i = 0; i < unmatchedList.length; i++) {
+                    var fac = unmatchedList[i];
+                    var courses = Object.keys(fac.data.courses).filter(function(c){ return c; }).sort().join(', ');
+                    var alertTypesStr = '';
+                    for (var type in fac.data.alertTypes) {
+                        if (alertTypesStr) alertTypesStr += ', ';
+                        alertTypesStr += type + ' (' + fac.data.alertTypes[type] + ')';
+                    }
+                    var row = unmatchedTable.insertRow();
+                    row.innerHTML = '<td><strong>' + fac.name + '</strong></td>' +
+                        '<td style="text-align: center; font-weight: bold; color: #dc3545;">' + fac.data.count + '</td>' +
+                        '<td>' + courses + '</td><td>' + alertTypesStr + '</td>';
+                }
+            }
+            
+            // Coverage table
+            var coverageTable = document.querySelector('#coverageTable tbody');
+            coverageTable.innerHTML = '';
+            var priorityDepts = ['BAT', 'COMM HLT', 'ELA', 'ENG', 'FYS', 'HLT SCI', 'HUM', 'LIBARTS', 'MEC', 'NAS', 'SOC SCI', 'SSN', 'Other'];
+            var sortedDepts = [];
+            for (var i = 0; i < priorityDepts.length; i++) { if (deptCoverage[priorityDepts[i]]) sortedDepts.push(priorityDepts[i]); }
+            for (var dept in deptCoverage) { if (priorityDepts.indexOf(dept) === -1) sortedDepts.push(dept); }
+            
+            var totalCov = { total: 0, matched: 0, unmatched: 0 };
+            for (var i = 0; i < sortedDepts.length; i++) {
+                var dept = sortedDepts[i];
+                var data = deptCoverage[dept];
+                var dcr = data.total > 0 ? ((data.matched / data.total) * 100).toFixed(1) : 0;
+                totalCov.total += data.total; totalCov.matched += data.matched; totalCov.unmatched += data.unmatched;
+                var cc = parseFloat(dcr) >= 90 ? '#28a745' : parseFloat(dcr) >= 70 ? '#ffc107' : '#dc3545';
+                var row = coverageTable.insertRow();
+                row.innerHTML = '<td>' + dept + '</td><td style="text-align: center;">' + data.total + '</td>' +
+                    '<td style="text-align: center; color: #28a745;">' + data.matched + '</td>' +
+                    '<td style="text-align: center; color: #dc3545;">' + data.unmatched + '</td>' +
+                    '<td style="text-align: center; font-weight: bold; color: ' + cc + ';">' + dcr + '%</td>';
+            }
+            var tcr = totalCov.total > 0 ? ((totalCov.matched / totalCov.total) * 100).toFixed(1) : 0;
+            var totalRow = coverageTable.insertRow();
+            totalRow.style.backgroundColor = '#e7f3ff'; totalRow.style.fontWeight = 'bold'; totalRow.style.borderTop = '2px solid #4a90e2';
+            totalRow.innerHTML = '<td>TOTAL</td><td style="text-align: center;">' + totalCov.total + '</td>' +
+                '<td style="text-align: center; color: #28a745;">' + totalCov.matched + '</td>' +
+                '<td style="text-align: center; color: #dc3545;">' + totalCov.unmatched + '</td>' +
+                '<td style="text-align: center;">' + tcr + '%</td>';
+            
+            // Impact summary
+            var impactContainer = document.getElementById('impactSummary');
+            var impactHtml = '';
+            if (unmatchedFacultyCount > 0) {
+                impactHtml += '<div class="alert-item" style="padding: 15px; background: #fff3cd; border-radius: 8px; margin-bottom: 10px;">' +
+                    '<strong>Department & Status Analysis:</strong> ' + unmatchedFacultyCount + ' unmatched faculty cannot be assigned to departments. ' +
+                    'Consider adding them to the Faculty List.</div>';
+                impactHtml += '<div class="alert-item" style="padding: 15px; background: #d4edda; border-radius: 8px;">' +
+                    '<strong>Course Analysis:</strong> Complete - all alerts mapped to courses regardless of faculty status.</div>';
+            } else {
+                impactHtml += '<div class="alert-item" style="padding: 15px; background: #d4edda; border-radius: 8px; color: #155724;">' +
+                    '<strong>Excellent Data Quality!</strong> All faculty submitting alerts are in the Faculty List.</div>';
+            }
+            impactContainer.innerHTML = impactHtml;
+            
+            // Excluded referrals table
+            var exclTable = document.querySelector('#excludedReferralsTable tbody');
+            exclTable.innerHTML = '';
+            var exclBySubmitter = {};
+            for (var i = 0; i < excludedReferrals.length; i++) {
+                var ref = excludedReferrals[i];
+                var submitter = ref['Referral or Alert Created By'];
+                if (!exclBySubmitter[submitter]) exclBySubmitter[submitter] = { count: 0, centers: {} };
+                exclBySubmitter[submitter].count++;
+                var center = getTutoringCenter(ref['Referral or Alert Reasons']);
+                exclBySubmitter[submitter].centers[center] = (exclBySubmitter[submitter].centers[center] || 0) + 1;
+            }
+            var exclList = [];
+            for (var name in exclBySubmitter) exclList.push({ name: name, data: exclBySubmitter[name] });
+            exclList.sort(function(a, b) { return b.data.count - a.data.count; });
+            
+            if (exclList.length === 0) {
+                var row = exclTable.insertRow();
+                row.innerHTML = '<td colspan="3" style="text-align: center; color: #28a745; font-weight: bold;">No excluded referrals - all referrals are from faculty</td>';
+            } else {
+                for (var i = 0; i < exclList.length; i++) {
+                    var item = exclList[i];
+                    var centers = [];
+                    for (var c in item.data.centers) centers.push(c + ' (' + item.data.centers[c] + ')');
+                    var row = exclTable.insertRow();
+                    row.innerHTML = '<td><strong>' + item.name + '</strong></td>' +
+                        '<td style="text-align: center; font-weight: bold;">' + item.data.count + '</td>' +
+                        '<td>' + centers.join(', ') + '</td>';
+                }
+            }
+        }
+
+        // ===== RENDER: Student Analysis =====
+        function renderStudentAnalysis(allExpandedItems, studentData) {
+            if (!studentData || studentData.length === 0) {
+                document.getElementById('noStudentDataMessage').style.display = 'block';
+                document.getElementById('studentOverviewCards').style.display = 'none';
+                document.getElementById('studentAlertBreakdown').parentElement.style.display = 'none';
+                document.getElementById('advisingOfficeSection').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('noStudentDataMessage').style.display = 'none';
+            
+            var studentMap = {};
+            var hasAdvisingOffice = false;
+            for (var i = 0; i < studentData.length; i++) {
+                var s = studentData[i];
+                studentMap[s['Student ID']] = s;
+                if (s['Advising Office']) hasAdvisingOffice = true;
+            }
+            
+            var studentAlertTracking = {};
+            var studentsWithNegative = {}, studentsWithPositive = {}, studentsWithReferral = {}, studentsWithAny = {};
+            var advisingOfficeData = {};
+            
+            for (var i = 0; i < studentData.length; i++) {
+                var sid = studentData[i]['Student ID'];
+                studentAlertTracking[sid] = { negative: 0, positive: 0, referral: 0, details: [] };
+            }
+            
+            for (var i = 0; i < allExpandedItems.length; i++) {
+                var alert = allExpandedItems[i];
+                var sid = alert['Student ID'];
+                var cat = alert['_category'];
+                
+                if (studentAlertTracking[sid]) {
+                    studentAlertTracking[sid].details.push(alert);
+                    studentsWithAny[sid] = true;
+                    
+                    if (cat === 'positive') {
+                        studentsWithPositive[sid] = true;
+                        studentAlertTracking[sid].positive++;
+                    } else if (cat === 'referral') {
+                        studentsWithReferral[sid] = true;
+                        studentAlertTracking[sid].referral++;
+                    } else {
+                        studentsWithNegative[sid] = true;
+                        studentAlertTracking[sid].negative++;
+                    }
+                    
+                    if (hasAdvisingOffice && studentMap[sid]) {
+                        var office = studentMap[sid]['Advising Office'] || 'No Office Assigned';
+                        if (!advisingOfficeData[office]) {
+                            advisingOfficeData[office] = {
+                                totalStudents: {}, studentsWithAny: {},
+                                studentsWithNegative: {}, studentsWithPositive: {}, studentsWithReferral: {},
+                                studentDetails: {}
+                            };
+                        }
+                        advisingOfficeData[office].totalStudents[sid] = true;
+                        advisingOfficeData[office].studentsWithAny[sid] = true;
+                        
+                        if (!advisingOfficeData[office].studentDetails[sid]) {
+                            advisingOfficeData[office].studentDetails[sid] = {
+                                name: studentMap[sid]['Student Name'] || 'Unknown',
+                                negative: 0, positive: 0, referral: 0, total: 0
+                            };
+                        }
+                        
+                        if (cat === 'positive') {
+                            advisingOfficeData[office].studentsWithPositive[sid] = true;
+                            advisingOfficeData[office].studentDetails[sid].positive++;
+                        } else if (cat === 'referral') {
+                            advisingOfficeData[office].studentsWithReferral[sid] = true;
+                            advisingOfficeData[office].studentDetails[sid].referral++;
+                        } else {
+                            advisingOfficeData[office].studentsWithNegative[sid] = true;
+                            advisingOfficeData[office].studentDetails[sid].negative++;
+                        }
+                        advisingOfficeData[office].studentDetails[sid].total++;
+                    }
+                }
+            }
+            
+            // Add all students to advising office tracking
+            if (hasAdvisingOffice) {
+                for (var i = 0; i < studentData.length; i++) {
+                    var s = studentData[i];
+                    var office = s['Advising Office'] || 'No Office Assigned';
+                    if (!advisingOfficeData[office]) {
+                        advisingOfficeData[office] = {
+                            totalStudents: {}, studentsWithAny: {},
+                            studentsWithNegative: {}, studentsWithPositive: {}, studentsWithReferral: {},
+                            studentDetails: {}
+                        };
+                    }
+                    advisingOfficeData[office].totalStudents[s['Student ID']] = true;
+                }
+            }
+            
+            var totalStudents = studentData.length;
+            var anyCount = Object.keys(studentsWithAny).length;
+            var negCount = Object.keys(studentsWithNegative).length;
+            var posCount = Object.keys(studentsWithPositive).length;
+            var refCount = Object.keys(studentsWithReferral).length;
+            
+            // Overview cards
+            var cards = [
+                { title: 'Total Students in File', value: totalStudents.toLocaleString(), detail: 'Complete student roster', color: '#4a90e2' },
+                { title: 'Students with Any Alert/Feedback', value: anyCount.toLocaleString(), detail: ((anyCount / totalStudents) * 100).toFixed(1) + '% of all students', color: '#9013fe' },
+                { title: 'Students with Negative Alerts', value: negCount.toLocaleString(), detail: ((negCount / totalStudents) * 100).toFixed(1) + '% of all students', color: '#dc3545' },
+                { title: 'Students with Positive Feedback', value: posCount.toLocaleString(), detail: ((posCount / totalStudents) * 100).toFixed(1) + '% of all students', color: '#28a745' },
+                { title: 'Students with Referrals', value: refCount.toLocaleString(), detail: ((refCount / totalStudents) * 100).toFixed(1) + '% of all students', color: '#17a2b8' }
+            ];
+            
+            var overviewHtml = '';
+            for (var i = 0; i < cards.length; i++) {
+                overviewHtml += '<div class="score-card" style="border-left-color: ' + cards[i].color + ';"><h3>' + cards[i].title + '</h3>' +
+                    '<div class="value">' + cards[i].value + '</div><div class="detail">' + cards[i].detail + '</div></div>';
+            }
+            document.getElementById('studentOverviewCards').innerHTML = overviewHtml;
+            
+            // Alert breakdown
+            var breakdownData = [
+                { type: 'NEGATIVE ALERTS', count: negCount, pct: ((negCount / totalStudents) * 100).toFixed(1), color: '#dc3545' },
+                { type: 'POSITIVE FEEDBACK', count: posCount, pct: ((posCount / totalStudents) * 100).toFixed(1), color: '#28a745' },
+                { type: 'REFERRALS (TUTORING)', count: refCount, pct: ((refCount / totalStudents) * 100).toFixed(1), color: '#17a2b8' },
+                { type: 'ANY ALERT OR FEEDBACK', count: anyCount, pct: ((anyCount / totalStudents) * 100).toFixed(1), color: '#667eea' }
+            ];
+            
+            var breakdownHtml = '';
+            for (var i = 0; i < breakdownData.length; i++) {
+                var item = breakdownData[i];
+                breakdownHtml += '<div class="alert-item" style="' + (i === breakdownData.length - 1 ? 'margin-top: 10px; padding-top: 15px; border-top: 2px solid #333; font-weight: bold;' : '') + '">' +
+                    '<span class="alert-type" style="color: ' + item.color + ';">' + item.type + '</span>' +
+                    '<span class="alert-count" style="background: ' + item.color + '20; color: ' + item.color + ';">' +
+                    item.count + ' students (' + item.pct + '%)</span></div>';
+            }
+            document.getElementById('studentAlertBreakdown').innerHTML = breakdownHtml;
+            
+            // Advising office analysis
+            if (hasAdvisingOffice) {
+                document.getElementById('advisingOfficeSection').style.display = 'block';
+                
+                var officeTableBody = document.querySelector('#advisingOfficeTable tbody');
+                officeTableBody.innerHTML = '';
+                
+                var allOffices = Object.keys(advisingOfficeData);
+                var singleOffices = allOffices.filter(function(k) { return k.indexOf(';') === -1; }).sort();
+                var multiOffices = allOffices.filter(function(k) { return k.indexOf(';') !== -1; }).sort();
+                var sortedOffices = singleOffices.concat(multiOffices);
+                
+                var totals = { students: 0, withAny: 0, withNegative: 0, withPositive: 0, withReferral: 0 };
+                
+                function renderOfficeRow(office) {
+                    var data = advisingOfficeData[office];
+                    var osc = Object.keys(data.totalStudents).length;
+                    var wac = Object.keys(data.studentsWithAny).length;
+                    var wnc = Object.keys(data.studentsWithNegative).length;
+                    var wpc = Object.keys(data.studentsWithPositive).length;
+                    var wrc = Object.keys(data.studentsWithReferral).length;
+                    
+                    totals.students += osc; totals.withAny += wac;
+                    totals.withNegative += wnc; totals.withPositive += wpc; totals.withReferral += wrc;
+                    
+                    var row = officeTableBody.insertRow();
+                    row.innerHTML = '<td><strong>' + office + '</strong></td>' +
+                        '<td style="text-align: center;">' + osc + '</td>' +
+                        '<td style="text-align: center;">' + wac + ' <span style="color: #6c757d;">(' + (osc ? ((wac/osc)*100).toFixed(1) : '0.0') + '%)</span></td>' +
+                        '<td style="text-align: center; color: #dc3545;">' + wnc + ' <span style="color: #6c757d;">(' + (osc ? ((wnc/osc)*100).toFixed(1) : '0.0') + '%)</span></td>' +
+                        '<td style="text-align: center; color: #28a745;">' + wpc + ' <span style="color: #6c757d;">(' + (osc ? ((wpc/osc)*100).toFixed(1) : '0.0') + '%)</span></td>' +
+                        '<td style="text-align: center; color: #17a2b8;">' + wrc + ' <span style="color: #6c757d;">(' + (osc ? ((wrc/osc)*100).toFixed(1) : '0.0') + '%)</span></td>';
+                }
+                
+                function renderSectionHeader(text) {
+                    var hr = officeTableBody.insertRow();
+                    var th = document.createElement('td');
+                    th.colSpan = 6; th.style.background = '#f8f9fa'; th.style.fontWeight = '700';
+                    th.style.borderTop = '2px solid #dee2e6'; th.style.padding = '8px 10px';
+                    th.textContent = text; hr.appendChild(th);
+                }
+                
+                if (singleOffices.length > 0) {
+                    renderSectionHeader('Single Office Assignments');
+                    for (var i = 0; i < singleOffices.length; i++) renderOfficeRow(singleOffices[i]);
+                }
+                if (multiOffices.length > 0) {
+                    renderSectionHeader('Multiple Office Assignments');
+                    for (var i = 0; i < multiOffices.length; i++) renderOfficeRow(multiOffices[i]);
+                }
+                
+                var totalRow = officeTableBody.insertRow();
+                totalRow.style.backgroundColor = '#e7f3ff'; totalRow.style.fontWeight = 'bold'; totalRow.style.borderTop = '2px solid #4a90e2';
+                totalRow.innerHTML = '<td>TOTAL</td><td style="text-align: center;">' + totals.students + '</td>' +
+                    '<td style="text-align: center;">' + totals.withAny + ' <span style="color: #495057;">(' + ((totals.withAny/totals.students)*100).toFixed(1) + '%)</span></td>' +
+                    '<td style="text-align: center; color: #dc3545;">' + totals.withNegative + ' <span style="color: #495057;">(' + ((totals.withNegative/totals.students)*100).toFixed(1) + '%)</span></td>' +
+                    '<td style="text-align: center; color: #28a745;">' + totals.withPositive + ' <span style="color: #495057;">(' + ((totals.withPositive/totals.students)*100).toFixed(1) + '%)</span></td>' +
+                    '<td style="text-align: center; color: #17a2b8;">' + totals.withReferral + ' <span style="color: #495057;">(' + ((totals.withReferral/totals.students)*100).toFixed(1) + '%)</span></td>';
+                
+                // Student details by office
+                var detailsTableBody = document.querySelector('#studentDetailsByOfficeTable tbody');
+                detailsTableBody.innerHTML = '';
+                
+                for (var oi = 0; oi < sortedOffices.length; oi++) {
+                    var office = sortedOffices[oi];
+                    var officeData = advisingOfficeData[office];
+                    
+                    var studentsInOffice = [];
+                    for (var sid in officeData.studentDetails) {
+                        var d = officeData.studentDetails[sid];
+                        studentsInOffice.push({ id: sid, name: d.name, negative: d.negative, positive: d.positive, referral: d.referral, total: d.total });
+                    }
+                    
+                    if (studentsInOffice.length === 0) continue;
+                    studentsInOffice.sort(function(a, b) { return b.total - a.total; });
+                    
+                    var headerRow = detailsTableBody.insertRow();
+                    headerRow.className = 'dept-header';
+                    headerRow.setAttribute('data-office-index', oi);
+                    
+                    var ota = 0;
+                    for (var si = 0; si < studentsInOffice.length; si++) ota += studentsInOffice[si].total;
+                    
+                    headerRow.innerHTML = '<td colspan="6"><span class="dept-toggle collapsed" id="office-toggle-' + oi + '">&#9660;</span>' +
+                        '<strong>' + office + '</strong><span class="dept-summary">(' + studentsInOffice.length + ' students with alerts, ' + ota + ' total)</span></td>';
+                    
+                    headerRow.onclick = (function(idx) {
+                        return function() {
+                            var toggle = document.getElementById('office-toggle-' + idx);
+                            var rows = document.querySelectorAll('.office-student-' + idx);
+                            if (toggle.classList.contains('collapsed')) {
+                                toggle.classList.remove('collapsed');
+                                for (var i = 0; i < rows.length; i++) rows[i].classList.remove('hidden');
+                            } else {
+                                toggle.classList.add('collapsed');
+                                for (var i = 0; i < rows.length; i++) rows[i].classList.add('hidden');
+                            }
+                        };
+                    })(oi);
+                    
+                    for (var si = 0; si < studentsInOffice.length; si++) {
+                        var student = studentsInOffice[si];
+                        var studentRow = detailsTableBody.insertRow();
+                        studentRow.className = 'faculty-row office-student-' + oi + ' hidden';
+                        studentRow.innerHTML = '<td style="padding-left: 40px;">' + student.name + '</td>' +
+                            '<td>' + student.id + '</td>' +
+                            '<td style="text-align: center;' + (student.negative > 0 ? ' color: #dc3545; font-weight: bold;' : '') + '">' + (student.negative || '-') + '</td>' +
+                            '<td style="text-align: center;' + (student.positive > 0 ? ' color: #28a745; font-weight: bold;' : '') + '">' + (student.positive || '-') + '</td>' +
+                            '<td style="text-align: center;' + (student.referral > 0 ? ' color: #17a2b8; font-weight: bold;' : '') + '">' + (student.referral || '-') + '</td>' +
+                            '<td style="text-align: center; font-weight: bold;">' + student.total + '</td>';
+                    }
+                }
+            } else {
+                document.getElementById('advisingOfficeSection').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
