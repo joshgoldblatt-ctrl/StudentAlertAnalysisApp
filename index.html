@@ -1128,10 +1128,13 @@
                 alertCounts[type].count++;
             }
             
-            // Faculty participation
+            // Faculty participation - only count submitters who are in the faculty list
             var facultySubmittedSet = {};
             for (var i = 0; i < alertsData.length; i++) {
-                facultySubmittedSet[alertsData[i]['Referral or Alert Created By']] = true;
+                var submitter = alertsData[i]['Referral or Alert Created By'];
+                if (facultyByName[submitter]) {
+                    facultySubmittedSet[submitter] = true;
+                }
             }
             
             var fullTimeFaculty = [];
