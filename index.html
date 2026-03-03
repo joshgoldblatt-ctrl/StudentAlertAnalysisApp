@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LaGuardia Student Alert Analysis App - Version 4</title>
+    <title>LaGuardia Student Alert Analysis App - Version 4b</title>
     <meta name="version" content="4">
     <meta name="description" content="Version 4 - Added average negative alerts per student and negative alert distribution table (1, 2, 3, 4, 5+) to Student Analysis tab. Version 3 - Added three-category classification (Negative Alerts, Positive Feedback, Referrals), smart reason splitting from CSV data labels, faculty-only referral filtering, tutoring center breakdown, and consistent data filtering across all tabs.">
     <meta name="author" content="Josh Goldblatt using Claude">
@@ -449,7 +449,7 @@
 <body>
     <div class="container">
         <h1>LaGuardia Student Alert Analysis App_V4</h1>
-        <div class="subtitle" style="text-align: center; color: #6c757d; margin-bottom: 5px;">Version 4 - Released March 2, 2026</div>
+        <div class="subtitle" style="text-align: center; color: #6c757d; margin-bottom: 5px;">Version 4 - Released March 3, 2026</div>
         <div class="subtitle" style="text-align: center; color: #6c757d; margin-bottom: 20px;">Developed by Josh Goldblatt using Claude</div>
         
         <!-- UPLOAD SECTION -->
@@ -623,11 +623,30 @@
                                 <tr>
                                     <th>Department</th>
                                     <th>Total Faculty</th>
+                                    <th>FT Faculty</th>
+                                    <th>PT Faculty</th>
                                     <th>Submitted (%)</th>
-                                    <th>Full-Time Submitted (%)</th>
-                                    <th>Part-Time Submitted (%)</th>
-                                    <th>Total Alerts/Feedback</th>
+                                    <th>FT Submitted (%)</th>
+                                    <th>PT Submitted (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="table-container" style="margin-top: 30px;">
+                        <h2>Alerts, Feedback &amp; Referrals by Department</h2>
+                        <table id="deptBreakdownTable">
+                            <thead>
+                                <tr>
+                                    <th>Department</th>
+                                    <th>Total Faculty</th>
+                                    <th>Negative Alerts</th>
+                                    <th>Negative Alert (%)</th>
+                                    <th>Positive Feedback</th>
+                                    <th>Positive Feedback (%)</th>
                                     <th>Referrals</th>
+                                    <th>Referrals (%)</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -841,7 +860,7 @@
             if (!reasonsString) return [];
             var results = [];
             // Split on ", " followed by a known prefix
-            var parts = reasonsString.split(/,\s*(?=Alert\s*-|Positive Feedback\s*-|Referral\s*-)/i);
+            var parts = reasonsString.split(/,\s*(?=Alert\s*-|Positive Feedback\s*-|Faculty Feedback\s*-|Referral\s*-)/i);
             for (var i = 0; i < parts.length; i++) {
                 var trimmed = parts[i].trim();
                 if (trimmed) results.push(trimmed);
@@ -858,7 +877,7 @@
             // Fallback keyword detection
             var lower = reason.toLowerCase();
             if (lower.indexOf('referral') === 0) return 'referral';
-            if (lower.indexOf('positive feedback') !== -1 || lower.indexOf('doing well') !== -1) return 'positive';
+            if (lower.indexOf('positive feedback') !== -1 || lower.indexOf('faculty feedback') !== -1 || lower.indexOf('doing well') !== -1) return 'positive';
             return 'negative';
         }
 
@@ -875,6 +894,7 @@
         function cleanAlertType(type) {
             return type.replace(/^Alert\s*-\s*/i, '')
                       .replace(/^Positive Feedback\s*-\s*/i, '')
+                      .replace(/^Faculty Feedback\s*-\s*/i, '')
                       .replace(/^Referral\s*-\s*Tutoring\s*-\s*/i, 'Tutoring: ')
                       .replace(/^Referral\s*-\s*/i, '')
                       .replace(/\s*\(Negative\)\s*/i, '')
@@ -1364,13 +1384,24 @@
 
             for (var dept in deptAnalysis) {
                 var data = deptAnalysis[dept];
-                var totalAlerts = 0, totalReferrals = 0;
+                var negCount = 0, posCount = 0, refCount = 0;
+                var facWithNeg = {}, facWithPos = {}, facWithRef = {};
                 for (var fac in data.facultyDetails) {
                     var c = data.facultyDetails[fac];
-                    totalAlerts += (c.negative || 0) + (c.positive || 0);
-                    totalReferrals += (c.referral || 0);
+                    negCount += (c.negative || 0);
+                    posCount += (c.positive || 0);
+                    refCount += (c.referral || 0);
+                    if (c.negative > 0) facWithNeg[fac] = true;
+                    if (c.positive > 0) facWithPos[fac] = true;
+                    if (c.referral > 0) facWithRef[fac] = true;
                 }
-                var info = { name: dept, data: data, totalAlerts: totalAlerts, totalReferrals: totalReferrals };
+                var info = {
+                    name: dept, data: data,
+                    negCount: negCount, posCount: posCount, refCount: refCount,
+                    facWithNeg: Object.keys(facWithNeg).length,
+                    facWithPos: Object.keys(facWithPos).length,
+                    facWithRef: Object.keys(facWithRef).length
+                };
                 if (topDeptNames.indexOf(dept) !== -1) topGroup.push(info);
                 else otherGroup.push(info);
             }
@@ -1378,12 +1409,13 @@
             topGroup.sort(function(a, b) { return topDeptNames.indexOf(a.name) - topDeptNames.indexOf(b.name); });
             otherGroup.sort(function(a, b) { return a.name.localeCompare(b.name); });
 
-            function initTotals() {
-                return { faculty: 0, submitted: 0, fullTimeSubmitted: 0, fullTime: 0, partTimeSubmitted: 0, partTime: 0, alerts: 0, referrals: 0 };
+            // === TABLE 1: Performance Metrics ===
+            function initTotals1() {
+                return { faculty: 0, fullTime: 0, partTime: 0, submitted: 0, fullTimeSubmitted: 0, partTimeSubmitted: 0 };
             }
-            var topTotals = initTotals(), otherTotals = initTotals();
+            var topTotals1 = initTotals1(), otherTotals1 = initTotals1();
 
-            function appendRow(info) {
+            function appendRow1(info) {
                 var data = info.data;
                 var sc = Object.keys(data.submitted).length;
                 var ftsc = Object.keys(data.fullTimeSubmitted).length;
@@ -1394,13 +1426,13 @@
 
                 var row = summaryBody.insertRow();
                 row.innerHTML = '<td>' + info.name + '</td><td>' + data.totalFaculty + '</td>' +
-                    '<td>' + sc + ' (' + sp + '%)</td><td>' + ftsc + ' (' + ftp + '%)</td>' +
-                    '<td>' + ptsc + ' (' + ptp + '%)</td><td>' + info.totalAlerts + '</td>' +
-                    '<td style="color: #17a2b8; font-weight: 600;">' + info.totalReferrals + '</td>';
+                    '<td>' + data.fullTime + '</td><td>' + data.partTime + '</td>' +
+                    '<td>' + sp + '%</td><td>' + ftp + '%</td>' +
+                    '<td>' + ptp + '%</td>';
                 return { sc: sc, ftsc: ftsc, ptsc: ptsc };
             }
 
-            function addSubtotalRow(label, totals, bg) {
+            function addSubtotalRow1(label, totals, bg) {
                 var sp = totals.faculty > 0 ? ((totals.submitted / totals.faculty) * 100).toFixed(1) : '0.0';
                 var ftp = totals.fullTime > 0 ? ((totals.fullTimeSubmitted / totals.fullTime) * 100).toFixed(1) : '0.0';
                 var ptp = totals.partTime > 0 ? ((totals.partTimeSubmitted / totals.partTime) * 100).toFixed(1) : '0.0';
@@ -1409,46 +1441,122 @@
                 r.style.backgroundColor = bg || '#f0f4f8';
                 r.style.fontWeight = 'bold';
                 r.innerHTML = '<td style="font-style: italic;">' + label + '</td><td>' + totals.faculty + '</td>' +
-                    '<td>' + totals.submitted + ' (' + sp + '%)</td><td>' + totals.fullTimeSubmitted + ' (' + ftp + '%)</td>' +
-                    '<td>' + totals.partTimeSubmitted + ' (' + ptp + '%)</td><td>' + totals.alerts + '</td>' +
-                    '<td style="color: #17a2b8;">' + totals.referrals + '</td>';
+                    '<td>' + totals.fullTime + '</td><td>' + totals.partTime + '</td>' +
+                    '<td>' + sp + '%</td><td>' + ftp + '%</td>' +
+                    '<td>' + ptp + '%</td>';
             }
 
-            function processGroup(group, totals) {
+            function processGroup1(group, totals) {
                 for (var i = 0; i < group.length; i++) {
                     var info = group[i];
-                    var counts = appendRow(info);
+                    var counts = appendRow1(info);
                     totals.faculty += info.data.totalFaculty;
+                    totals.fullTime += info.data.fullTime;
+                    totals.partTime += info.data.partTime;
                     totals.submitted += counts.sc;
                     totals.fullTimeSubmitted += counts.ftsc;
-                    totals.fullTime += info.data.fullTime;
                     totals.partTimeSubmitted += counts.ptsc;
-                    totals.partTime += info.data.partTime;
-                    totals.alerts += info.totalAlerts;
-                    totals.referrals += info.totalReferrals;
                 }
             }
 
-            processGroup(topGroup, topTotals);
-            if (topGroup.length > 0) addSubtotalRow('Subtotal (Selected Departments)', topTotals, '#f0f4f8');
-            processGroup(otherGroup, otherTotals);
-            if (otherGroup.length > 0) addSubtotalRow('Subtotal (Other Departments)', otherTotals, '#f9f9fb');
+            processGroup1(topGroup, topTotals1);
+            if (topGroup.length > 0) addSubtotalRow1('Subtotal (Selected Departments)', topTotals1, '#f0f4f8');
+            processGroup1(otherGroup, otherTotals1);
+            if (otherGroup.length > 0) addSubtotalRow1('Subtotal (Other Departments)', otherTotals1, '#f9f9fb');
 
-            // Grand total
-            var grand = initTotals();
-            for (var k in grand) { grand[k] = topTotals[k] + otherTotals[k]; }
-            var gsp = grand.faculty > 0 ? ((grand.submitted / grand.faculty) * 100).toFixed(1) : '0.0';
-            var gftp = grand.fullTime > 0 ? ((grand.fullTimeSubmitted / grand.fullTime) * 100).toFixed(1) : '0.0';
-            var gptp = grand.partTime > 0 ? ((grand.partTimeSubmitted / grand.partTime) * 100).toFixed(1) : '0.0';
+            var grand1 = initTotals1();
+            for (var k in grand1) { grand1[k] = topTotals1[k] + otherTotals1[k]; }
+            var gsp = grand1.faculty > 0 ? ((grand1.submitted / grand1.faculty) * 100).toFixed(1) : '0.0';
+            var gftp = grand1.fullTime > 0 ? ((grand1.fullTimeSubmitted / grand1.fullTime) * 100).toFixed(1) : '0.0';
+            var gptp = grand1.partTime > 0 ? ((grand1.partTimeSubmitted / grand1.partTime) * 100).toFixed(1) : '0.0';
 
             var gr = summaryBody.insertRow();
             gr.style.backgroundColor = '#e7f3ff';
             gr.style.fontWeight = 'bold';
             gr.style.borderTop = '2px solid #4a90e2';
-            gr.innerHTML = '<td>GRAND TOTAL</td><td>' + grand.faculty + '</td>' +
-                '<td>' + grand.submitted + ' (' + gsp + '%)</td><td>' + grand.fullTimeSubmitted + ' (' + gftp + '%)</td>' +
-                '<td>' + grand.partTimeSubmitted + ' (' + gptp + '%)</td><td>' + grand.alerts + '</td>' +
-                '<td style="color: #17a2b8;">' + grand.referrals + '</td>';
+            gr.innerHTML = '<td>GRAND TOTAL</td><td>' + grand1.faculty + '</td>' +
+                '<td>' + grand1.fullTime + '</td><td>' + grand1.partTime + '</td>' +
+                '<td>' + gsp + '%</td><td>' + gftp + '%</td>' +
+                '<td>' + gptp + '%</td>';
+
+            // === TABLE 2: Alerts/Feedback/Referrals Breakdown ===
+            var breakdownBody = document.querySelector('#deptBreakdownTable tbody');
+            breakdownBody.innerHTML = '';
+
+            function initTotals2() {
+                return { faculty: 0, negCount: 0, posCount: 0, refCount: 0, facWithNeg: 0, facWithPos: 0, facWithRef: 0 };
+            }
+            var topTotals2 = initTotals2(), otherTotals2 = initTotals2();
+
+            function appendRow2(info) {
+                var tf = info.data.totalFaculty;
+                var negPct = tf > 0 ? ((info.facWithNeg / tf) * 100).toFixed(1) : '0.0';
+                var posPct = tf > 0 ? ((info.facWithPos / tf) * 100).toFixed(1) : '0.0';
+                var refPct = tf > 0 ? ((info.facWithRef / tf) * 100).toFixed(1) : '0.0';
+
+                var row = breakdownBody.insertRow();
+                row.innerHTML = '<td>' + info.name + '</td><td>' + tf + '</td>' +
+                    '<td style="color: #dc3545; font-weight: 600;">' + info.negCount + '</td>' +
+                    '<td>' + negPct + '%</td>' +
+                    '<td style="color: #28a745; font-weight: 600;">' + info.posCount + '</td>' +
+                    '<td>' + posPct + '%</td>' +
+                    '<td style="color: #17a2b8; font-weight: 600;">' + info.refCount + '</td>' +
+                    '<td>' + refPct + '%</td>';
+            }
+
+            function addSubtotalRow2(label, totals, bg) {
+                var negPct = totals.faculty > 0 ? ((totals.facWithNeg / totals.faculty) * 100).toFixed(1) : '0.0';
+                var posPct = totals.faculty > 0 ? ((totals.facWithPos / totals.faculty) * 100).toFixed(1) : '0.0';
+                var refPct = totals.faculty > 0 ? ((totals.facWithRef / totals.faculty) * 100).toFixed(1) : '0.0';
+
+                var r = breakdownBody.insertRow();
+                r.style.backgroundColor = bg || '#f0f4f8';
+                r.style.fontWeight = 'bold';
+                r.innerHTML = '<td style="font-style: italic;">' + label + '</td><td>' + totals.faculty + '</td>' +
+                    '<td style="color: #dc3545;">' + totals.negCount + '</td>' +
+                    '<td>' + negPct + '%</td>' +
+                    '<td style="color: #28a745;">' + totals.posCount + '</td>' +
+                    '<td>' + posPct + '%</td>' +
+                    '<td style="color: #17a2b8;">' + totals.refCount + '</td>' +
+                    '<td>' + refPct + '%</td>';
+            }
+
+            function processGroup2(group, totals) {
+                for (var i = 0; i < group.length; i++) {
+                    var info = group[i];
+                    appendRow2(info);
+                    totals.faculty += info.data.totalFaculty;
+                    totals.negCount += info.negCount;
+                    totals.posCount += info.posCount;
+                    totals.refCount += info.refCount;
+                    totals.facWithNeg += info.facWithNeg;
+                    totals.facWithPos += info.facWithPos;
+                    totals.facWithRef += info.facWithRef;
+                }
+            }
+
+            processGroup2(topGroup, topTotals2);
+            if (topGroup.length > 0) addSubtotalRow2('Subtotal (Selected Departments)', topTotals2, '#f0f4f8');
+            processGroup2(otherGroup, otherTotals2);
+            if (otherGroup.length > 0) addSubtotalRow2('Subtotal (Other Departments)', otherTotals2, '#f9f9fb');
+
+            var grand2 = initTotals2();
+            for (var k in grand2) { grand2[k] = topTotals2[k] + otherTotals2[k]; }
+            var gnPct = grand2.faculty > 0 ? ((grand2.facWithNeg / grand2.faculty) * 100).toFixed(1) : '0.0';
+            var gpPct = grand2.faculty > 0 ? ((grand2.facWithPos / grand2.faculty) * 100).toFixed(1) : '0.0';
+            var grPct = grand2.faculty > 0 ? ((grand2.facWithRef / grand2.faculty) * 100).toFixed(1) : '0.0';
+
+            var gr2 = breakdownBody.insertRow();
+            gr2.style.backgroundColor = '#e7f3ff';
+            gr2.style.fontWeight = 'bold';
+            gr2.style.borderTop = '2px solid #4a90e2';
+            gr2.innerHTML = '<td>GRAND TOTAL</td><td>' + grand2.faculty + '</td>' +
+                '<td style="color: #dc3545;">' + grand2.negCount + '</td>' +
+                '<td>' + gnPct + '%</td>' +
+                '<td style="color: #28a745;">' + grand2.posCount + '</td>' +
+                '<td>' + gpPct + '%</td>' +
+                '<td style="color: #17a2b8;">' + grand2.refCount + '</td>' +
+                '<td>' + grPct + '%</td>';
 
             renderFacultyDetailsTable(deptAnalysis, topDeptNames);
         }
