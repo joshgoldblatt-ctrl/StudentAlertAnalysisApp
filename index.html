@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LaGuardia Student Alert Analysis App - Version 4b</title>
-    <meta name="version" content="4">
-    <meta name="description" content="Version 4 - Added average negative alerts per student and negative alert distribution table (1, 2, 3, 4, 5+) to Student Analysis tab. Version 3 - Added three-category classification (Negative Alerts, Positive Feedback, Referrals), smart reason splitting from CSV data labels, faculty-only referral filtering, tutoring center breakdown, and consistent data filtering across all tabs.">
+    <title>LaGuardia Student Alert Analysis App - Version 6</title>
+    <meta name="version" content="6">
+    <meta name="description" content="Version 6 - Added Top 20 Courses by Negative Alerts table and Export to CSV on Course Analysis tab. Version 5 - Split Department Analysis into two tables with percentage-only columns. Version 4 - Added negative alert distribution to Student Analysis. Version 3 - Three-category classification, smart reason splitting, faculty-only referral filtering.">
     <meta name="author" content="Josh Goldblatt using Claude">
     <style>
         * {
@@ -448,8 +448,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>LaGuardia Student Alert Analysis App_V4</h1>
-        <div class="subtitle" style="text-align: center; color: #6c757d; margin-bottom: 5px;">Version 4 - Released March 3, 2026</div>
+        <h1>LaGuardia Student Alert Analysis App_V6</h1>
+        <div class="subtitle" style="text-align: center; color: #6c757d; margin-bottom: 5px;">Version 6 - Released March 6, 2026</div>
         <div class="subtitle" style="text-align: center; color: #6c757d; margin-bottom: 20px;">Developed by Josh Goldblatt using Claude</div>
         
         <!-- UPLOAD SECTION -->
@@ -657,11 +657,32 @@
                 <!-- COURSES TAB -->
                 <div id="courses-tab" class="tab-content">
                     <div class="section-title">Course-Level Analysis</div>
+                    
+                    <div class="table-container">
+                        <h2>Top 20 Courses by Negative Alerts</h2>
+                        <table id="top20CoursesTable">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Course Number</th>
+                                    <th>Course Name</th>
+                                    <th>Department</th>
+                                    <th>Negative Alerts</th>
+                                    <th>Positive Feedback</th>
+                                    <th>Referrals</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
                     <div class="table-container">
                         <h2>Alerts, Feedback &amp; Referrals by Course</h2>
                         <div style="margin-bottom: 15px;">
                             <button id="expandAllCoursesBtn" style="margin-right: 10px; padding: 8px 15px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Expand All</button>
                             <button id="collapseAllCoursesBtn" style="padding: 8px 15px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Collapse All</button>
+                            <button id="exportCoursesCsvBtn" style="margin-left: 10px; padding: 8px 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; cursor: pointer;">Export to CSV</button>
                         </div>
                         <table id="courseAnalysisTable">
                             <thead>
@@ -1850,7 +1871,43 @@
                 '<td style="color: #17a2b8;">' + gt.referral + '</td>' +
                 '<td>' + gt.total + '</td>';
             
-            // Expand/Collapse
+            // === TOP 20 COURSES BY NEGATIVE ALERTS ===
+            var allCoursesList = [];
+            for (var d in courseData) {
+                for (var cn in courseData[d]) {
+                    var c = courseData[d][cn];
+                    allCoursesList.push({
+                        courseNum: cn, courseName: c.courseName, dept: d,
+                        negative: c.negative, positive: c.positive, referral: c.referral, total: c.total
+                    });
+                }
+            }
+            allCoursesList.sort(function(a, b) {
+                if (b.negative !== a.negative) return b.negative - a.negative;
+                return b.total - a.total;
+            });
+            
+            var top20Body = document.querySelector('#top20CoursesTable tbody');
+            top20Body.innerHTML = '';
+            var top20Count = Math.min(20, allCoursesList.length);
+            for (var i = 0; i < top20Count; i++) {
+                var c = allCoursesList[i];
+                if (c.negative === 0) break;
+                var row = top20Body.insertRow();
+                row.innerHTML = '<td style="text-align: center; font-weight: 600;">' + (i + 1) + '</td>' +
+                    '<td><strong>' + c.courseNum + '</strong></td>' +
+                    '<td>' + c.courseName + '</td>' +
+                    '<td>' + c.dept + '</td>' +
+                    '<td style="color: #dc3545; font-weight: 600;">' + c.negative + '</td>' +
+                    '<td style="color: #28a745; font-weight: 600;">' + c.positive + '</td>' +
+                    '<td style="color: #17a2b8; font-weight: 600;">' + c.referral + '</td>' +
+                    '<td><strong>' + c.total + '</strong></td>';
+            }
+            
+            // Store allCoursesList globally for CSV export
+            window._courseExportData = allCoursesList;
+
+            // Expand/Collapse and CSV Export
             setTimeout(function() {
                 var expandBtn = document.getElementById('expandAllCoursesBtn');
                 var collapseBtn = document.getElementById('collapseAllCoursesBtn');
@@ -1868,6 +1925,26 @@
                         var r = document.querySelectorAll('[class*="course-dept-"]');
                         for (var i = 0; i < t.length; i++) t[i].classList.add('collapsed');
                         for (var i = 0; i < r.length; i++) r[i].classList.add('hidden');
+                    };
+                }
+                
+                var exportBtn = document.getElementById('exportCoursesCsvBtn');
+                if (exportBtn) {
+                    exportBtn.onclick = function() {
+                        var data = window._courseExportData || [];
+                        var csv = 'Course Number,Course Name,Department,Negative Alerts,Positive Feedback,Referrals,Total\n';
+                        for (var i = 0; i < data.length; i++) {
+                            var c = data[i];
+                            var name = c.courseName.replace(/"/g, '""');
+                            var dept = c.dept.replace(/"/g, '""');
+                            csv += '"' + c.courseNum + '","' + name + '","' + dept + '",' +
+                                c.negative + ',' + c.positive + ',' + c.referral + ',' + c.total + '\n';
+                        }
+                        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                        var link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = 'Course_Analysis_Export.csv';
+                        link.click();
                     };
                 }
             }, 100);
