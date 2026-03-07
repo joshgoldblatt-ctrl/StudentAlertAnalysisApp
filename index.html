@@ -444,6 +444,83 @@
             padding-bottom: 10px;
             border-bottom: 3px solid #e9ecef;
         }
+
+        .update-history-toggle {
+            display: block;
+            width: 100%;
+            padding: 12px 20px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            color: #495057;
+            text-align: left;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .update-history-toggle:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        .update-history-toggle .toggle-arrow {
+            display: inline-block;
+            margin-right: 8px;
+            transition: transform 0.3s;
+        }
+
+        .update-history-toggle .toggle-arrow.open {
+            transform: rotate(90deg);
+        }
+
+        .update-history-content {
+            display: none;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px 25px;
+            margin-bottom: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .update-history-content.open {
+            display: block;
+        }
+
+        .version-entry {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .version-entry:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .version-entry h3 {
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 1.05em;
+        }
+
+        .version-entry .version-date {
+            color: #6c757d;
+            font-size: 0.85em;
+            margin-bottom: 8px;
+        }
+
+        .version-entry p {
+            color: #495057;
+            font-size: 0.95em;
+            line-height: 1.5;
+            margin: 4px 0;
+        }
     </style>
 </head>
 <body>
@@ -451,6 +528,69 @@
         <h1>LaGuardia Student Alert Analysis App_V6</h1>
         <div class="subtitle" style="text-align: center; color: #6c757d; margin-bottom: 5px;">Version 6 - Released March 6, 2026</div>
         <div class="subtitle" style="text-align: center; color: #6c757d; margin-bottom: 20px;">Developed by Josh Goldblatt using Claude</div>
+        
+        <button class="update-history-toggle" onclick="var c=document.getElementById('updateHistory');var a=this.querySelector('.toggle-arrow');if(c.classList.contains('open')){c.classList.remove('open');a.classList.remove('open');}else{c.classList.add('open');a.classList.add('open');}">
+            <span class="toggle-arrow">&#9654;</span> Update History
+        </button>
+        <div id="updateHistory" class="update-history-content">
+            <div class="version-entry">
+                <h3>Version 6</h3>
+                <div class="version-date">March 6, 2026</div>
+                <p>Added Top 20 Courses by Negative Alerts ranked table to Course Analysis tab.</p>
+                <p>Added Export to CSV button for all course data with columns: Course Number, Course Name, Department, Negative Alerts, Positive Feedback, Referrals, Total.</p>
+            </div>
+            <div class="version-entry">
+                <h3>Version 5</h3>
+                <div class="version-date">March 3, 2026</div>
+                <p>Split Department Analysis into two tables: Department Performance Metrics (with FT/PT faculty counts, percentage-only submission rates) and Alerts, Feedback &amp; Referrals by Department (raw counts + % of faculty submitting each type).</p>
+                <p>Added Faculty Feedback prefix support for FA24 data compatibility.</p>
+                <p>Removed raw faculty counts from percentage columns (percentage-only display).</p>
+            </div>
+            <div class="version-entry">
+                <h3>Version 4</h3>
+                <div class="version-date">March 2, 2026</div>
+                <p>Added average negative alerts per student to Student Analysis (denominator: students with at least one alert).</p>
+                <p>Added Negative Alert Distribution table (1, 2, 3, 4, 5+ alerts) with counts and percentages.</p>
+                <p>Fixed Overview "Students with Alerts" card to use filtered dataset, matching Student Analysis tab.</p>
+                <p>Fixed faculty participation rate to only count submitters in the faculty list.</p>
+                <p>Relabeled Overview card to "Students with Alerts, Positive Feedback, or Referrals."</p>
+            </div>
+            <div class="version-entry">
+                <h3>Version 3</h3>
+                <div class="version-date">March 1, 2026</div>
+                <p>Core overhaul for new data format. Replaced keyword-based classification with direct parsing of (Negative), (Positive), (Neutral) labels from alert data.</p>
+                <p>Added smart reason-splitting regex to handle comma-separated multi-reason entries without breaking on commas inside reason names.</p>
+                <p>Introduced three-category system across all tabs: Negative Alerts, Positive Feedback, and Referrals (Tutoring).</p>
+                <p>Removed hardcoded validAlertTypes array; all reason types accepted dynamically.</p>
+                <p>Referrals only counted if submitter is in the faculty list. Non-faculty referrals tracked on Validation tab.</p>
+                <p>Added Tutoring Center Breakdown table on Faculty Details tab.</p>
+            </div>
+            <div class="version-entry">
+                <h3>Version 2</h3>
+                <div class="version-date">November 18, 2025</div>
+                <p>Simplified alert tracking with keyword-based positive/negative classification.</p>
+                <p>Updated column names to new format (Referral or Alert Reasons, Referral or Alert Created By, etc.).</p>
+                <p>Simplified tables to show Negative Alerts, Positive Feedback, and Total columns.</p>
+                <p>Fixed NaN issues in department and faculty totals.</p>
+            </div>
+            <div class="version-entry">
+                <h3>Version 1.9.1</h3>
+                <div class="version-date">August 19, 2025</div>
+                <p>Merged Student Analysis functionality from standalone app into main dashboard.</p>
+                <p>Added Student Analysis tab with unduplicated student counts, alert breakdowns, and Advising Office analysis.</p>
+                <p>Priority department grouping added to Department Analysis and Faculty Details with subtotals.</p>
+                <p>Course-to-department mapping updated to use course prefix system from CSV data.</p>
+                <p>Added Data Validation tab with unmatched faculty tracking, coverage rates, and impact summary.</p>
+            </div>
+            <div class="version-entry">
+                <h3>Version 1.0 - 1.8</h3>
+                <div class="version-date">August 2025</div>
+                <p>Initial development of Student Alert Analysis Dashboard.</p>
+                <p>Core functionality: CSV file processing, faculty participation metrics, department analysis, course analysis, and faculty details.</p>
+                <p>Tab-based interface with Overview, Department Analysis, Course Analysis, and Faculty Details.</p>
+                <p>Collapsible department sections and expand/collapse all controls.</p>
+            </div>
+        </div>
         
         <!-- UPLOAD SECTION -->
         <div class="upload-section">
